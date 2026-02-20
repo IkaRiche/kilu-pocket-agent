@@ -32,13 +32,13 @@ fun ApproverTasksHomeScreen(
     val scope = rememberCoroutineScope()
     val jsonParser = Json { ignoreUnknownKeys = true }
 
-    fun loadTasks() {
+    val loadTasks = {
         scope.launch {
             isLoading = true
             errorMsg = null
             try {
                 val req = Request.Builder()
-                    .url("\${apiClient.getBaseUrl()}/v1/tasks?limit=10")
+                    .url("${apiClient.getBaseUrl()}/v1/tasks?limit=10")
                     .get()
                     .build()
                 val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }
@@ -57,6 +57,7 @@ fun ApproverTasksHomeScreen(
                 isLoading = false
             }
         }
+        Unit
     }
 
     LaunchedEffect(Unit) {

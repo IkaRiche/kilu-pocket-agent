@@ -7,7 +7,7 @@ import com.kilu.pocketagent.BuildConfig
 
 enum class Role { APPROVER, HUB }
 
-class DeviceProfileStore(context: Context) {
+class DeviceProfileStore(private val context: Context) {
     private val masterKey = MasterKey.Builder(context)
         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
         .build()
@@ -26,7 +26,7 @@ class DeviceProfileStore(context: Context) {
         if (oldRole != null && oldRole != role) {
             clearPairing()
             try {
-                com.kilu.pocketagent.core.crypto.KeyManager(prefs.run { context } ?: throw RuntimeException()).wipeKeys(oldRole)
+                com.kilu.pocketagent.core.crypto.KeyManager(context).wipeKeys(oldRole)
             } catch (e: Exception) {}
         }
         prefs.edit().putString("role", role.name).apply()

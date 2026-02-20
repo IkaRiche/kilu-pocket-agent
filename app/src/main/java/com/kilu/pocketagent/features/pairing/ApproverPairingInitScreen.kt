@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.kilu.pocketagent.BuildConfig
 import com.kilu.pocketagent.core.crypto.HashingUtil
 import com.kilu.pocketagent.core.crypto.KeyManager
 import com.kilu.pocketagent.core.network.ApiClient

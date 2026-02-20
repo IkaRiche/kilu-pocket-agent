@@ -58,7 +58,8 @@ class HubRuntimeService : LifecycleService() {
         
         startForeground(NOTIFICATION_ID, buildNotification("Hub is running 24/7", "IDLE"))
         
-        val apiClient = com.kilu.pocketagent.core.network.ApiClient(this)
+        val store = com.kilu.pocketagent.core.storage.DeviceProfileStore(this)
+        val apiClient = com.kilu.pocketagent.core.network.ApiClient(store)
         val loop = HubRuntimeLoop(this, apiClient)
         loop.onStateChanged = { state, msg ->
             if (!isPaused) {
@@ -108,7 +109,7 @@ class HubRuntimeService : LifecycleService() {
         
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("KiLu Hub")
-            .setContentText("\$text [\$stateText]")
+            .setContentText("$text [$stateText]")
             .setSmallIcon(android.R.drawable.ic_menu_agenda)
             .setContentIntent(pendingIntent)
             .setOngoing(true)

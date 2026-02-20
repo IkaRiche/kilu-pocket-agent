@@ -114,9 +114,16 @@ fun InboxCard(ep: InboxEpisode, apiClient: ApiClient, jsonParser: Json, onAcked:
             
             if (isExpanded && ep.payload != null) {
                 if (ep.event_type == "RESULT_READY") {
-                    try {
-                        val resultView = jsonParser.decodeFromJsonElement<ResultPayloadView>(ep.payload.getValue("result"))
-                        Text("Source: \${resultView.url}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+                    val resultView = remember(ep.payload) {
+                        try {
+                            jsonParser.decodeFromJsonElement<ResultPayloadView>(ep.payload.getValue("result"))
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }
+                    
+                    if (resultView != null) {
+                        Text("Source: ${resultView.url}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(resultView.summary, style = MaterialTheme.typography.bodyLarge)
                         Spacer(modifier = Modifier.height(8.dp))
@@ -128,7 +135,7 @@ fun InboxCard(ep: InboxEpisode, apiClient: ApiClient, jsonParser: Json, onAcked:
                         if (rawExpanded) {
                             Text(resultView.extracted_text, style = MaterialTheme.typography.bodySmall, maxLines = 15)
                         }
-                    } catch (e: Exception) {
+                    } else {
                         Text("Failed to parse result details.", color = MaterialTheme.colorScheme.error)
                     }
                 } else if (ep.event_type == "ASSUMPTIONS_REQUIRED") {

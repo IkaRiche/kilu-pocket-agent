@@ -6,7 +6,7 @@ import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 
-class ApiClient(private val store: DeviceProfileStore) {
+class ApiClient(val store: DeviceProfileStore) {
     private val authInterceptor = Interceptor { chain ->
         val requestBuilder = chain.request().newBuilder()
         store.getSessionToken()?.let { token ->
