@@ -23,7 +23,11 @@ object ErrorHandler {
                 null
             }
         } catch (e: Exception) {
-            "Failed to parse server error format."
+            if (!bodyString.isNullOrEmpty()) {
+                bodyString.take(150) // Return a snippet of the raw body
+            } else {
+                "Failed to parse server error format."
+            }
         }
 
         return when (code) {

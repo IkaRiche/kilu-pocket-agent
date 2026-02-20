@@ -112,7 +112,7 @@ fun ApproverPairingInitScreen(apiClient: ApiClient, store: DeviceProfileStore, o
             try {
                 val req = Request.Builder()
                     .url("${apiClient.getBaseUrl()}/v1/devices/approver/init")
-                    .post("{}".toRequestBody(null))
+                    .post("{}".toRequestBody("application/json".toMediaType()))
                     .build()
                 val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }
                 if (resp.isSuccessful) {
