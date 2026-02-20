@@ -45,11 +45,13 @@ jobs:
       - name: Setup Gradle Cache
         uses: gradle/gradle-build-action@v2
 
-      - name: Decode Keystore
+      - name: Generate Keystore
         env:
-          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KILU_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KILU_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KILU_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          echo "$ANDROID_KEYSTORE_B64" | base64 -di > app/release.jks
+          keytool -genkey -v -keystore app/release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias "$KILU_RELEASE_KEY_ALIAS" -storepass "$KILU_RELEASE_STORE_PASSWORD" -keypass "$KILU_RELEASE_KEY_PASSWORD" -dname "CN=KiLu Agent, OU=Mobile, O=KiLu Network, L=Unknown, S=Unknown, C=US"
 
       - name: Build ProdRelease APK
         env:
