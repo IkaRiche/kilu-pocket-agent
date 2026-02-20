@@ -43,7 +43,7 @@ fun PlanPreviewScreen(
         try {
             val req = Request.Builder()
                 .url("\${apiClient.getBaseUrl()}/v1/tasks/\$taskId/plan")
-                .post("{}".toRequestBody(null)) // assuming POST based on user docs (fetch boundaries)
+                .post("{}".toRequestBody("application/json".toMediaType()))
                 .build()
             val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }
             if (resp.isSuccessful) {

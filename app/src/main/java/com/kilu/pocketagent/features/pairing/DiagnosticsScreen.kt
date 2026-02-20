@@ -19,6 +19,7 @@ fun DiagnosticsScreen(store: DeviceProfileStore, onBack: () -> Unit) {
     val role = store.getRole()
     val fingerprint = try {
         if (role != null) {
+            keyManager.ensureKey(role)
             val pubB64 = keyManager.publicKey(role)
             val bytes = android.util.Base64.decode(pubB64, android.util.Base64.NO_WRAP)
             val digest = MessageDigest.getInstance("SHA-256").digest(bytes)
