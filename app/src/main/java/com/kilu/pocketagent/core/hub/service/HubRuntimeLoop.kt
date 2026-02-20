@@ -242,7 +242,7 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
                     val bodyStr = resp.body?.string() ?: "[]"
                     jsonParser.decodeFromString<List<HubQueueResponse>>(bodyStr)
                 } else if (resp.code == 401 || resp.code == 403) {
-                    apiClient.store.remove("sessionToken") // Force Error Auth
+                    apiClient.store.clearSessionToken() // Force Error Auth
                     emptyList()
                 } else {
                     emptyList()

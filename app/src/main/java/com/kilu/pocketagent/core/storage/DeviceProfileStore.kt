@@ -43,6 +43,7 @@ class DeviceProfileStore(private val context: Context) {
 
     fun getSessionToken(): String? = prefs.getString("sessionToken", null)
     fun setSessionToken(token: String) = prefs.edit().putString("sessionToken", token).apply()
+    fun clearSessionToken() = prefs.edit().remove("sessionToken").apply()
 
     fun getKeyAlias(): String = prefs.getString("keyAlias", "kilu_default_key")!!
     fun setKeyAlias(alias: String) = prefs.edit().putString("keyAlias", alias).apply()

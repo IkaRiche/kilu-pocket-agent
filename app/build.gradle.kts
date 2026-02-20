@@ -99,6 +99,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     
+    // Crypto
+    implementation("org.bouncycastle:bcprov-jdk15to18:1.77")
+    
     // QR
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
     implementation("com.google.zxing:core:3.5.3")
