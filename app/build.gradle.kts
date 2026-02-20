@@ -28,6 +28,7 @@ android {
                 storePassword = System.getenv("KILU_RELEASE_STORE_PASSWORD") ?: project.findProperty("KILU_RELEASE_STORE_PASSWORD")?.toString()
                 keyAlias = System.getenv("KILU_RELEASE_KEY_ALIAS") ?: project.findProperty("KILU_RELEASE_KEY_ALIAS")?.toString()
                 keyPassword = System.getenv("KILU_RELEASE_KEY_PASSWORD") ?: project.findProperty("KILU_RELEASE_KEY_PASSWORD")?.toString()
+                storeType = System.getenv("KILU_RELEASE_STORE_TYPE") ?: project.findProperty("KILU_RELEASE_STORE_TYPE")?.toString() ?: "JKS"
             }
         }
     }
