@@ -49,7 +49,7 @@ jobs:
         env:
           ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
         run: |
-          echo "$ANDROID_KEYSTORE_B64" | base64 -d > app/release.jks
+          echo "$ANDROID_KEYSTORE_B64" | base64 -di > app/release.jks
 
       - name: Build ProdRelease APK
         env:
