@@ -25,6 +25,9 @@ class DeviceProfileStore(context: Context) {
         val oldRole = getRole()
         if (oldRole != null && oldRole != role) {
             clearPairing()
+            try {
+                com.kilu.pocketagent.core.crypto.KeyManager(prefs.run { context } ?: throw RuntimeException()).wipeKeys(oldRole)
+            } catch (e: Exception) {}
         }
         prefs.edit().putString("role", role.name).apply()
     }

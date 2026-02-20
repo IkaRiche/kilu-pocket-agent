@@ -15,6 +15,7 @@ import com.kilu.pocketagent.features.onboarding.RoleSelectScreen
 import com.kilu.pocketagent.features.onboarding.ControlPlaneUrlScreen
 import com.kilu.pocketagent.features.pairing.PairingHomeScreen
 import com.kilu.pocketagent.features.pairing.ApproverPairingInitScreen
+import com.kilu.pocketagent.features.pairing.DiagnosticsScreen
 import com.kilu.pocketagent.features.pairing.HubScanScreen
 import com.kilu.pocketagent.features.pairing.HubOfferDetailsScreen
 import com.kilu.pocketagent.shared.models.QRPayload
@@ -50,26 +51,59 @@ fun NavGraph() {
             )
         }
         composable("pairing_home") {
-            if (store.getRole() == Role.APPROVER) {
-                ApproverPairingInitScreen(apiClient)
-            } else {
-                HubScanScreen(
-                    onScanSuccess = { payload ->
-                        scannedPayload = payload
-                        navController.navigate("hub_offer_details")
+            PairingHomeScreen(
+                store = store,
+                apiClient = apiClient,
+                onChangeRole = {
+                    navController.navigate("role_select") {
+                        popUpTo("pairing_home") { inclusive = true }
                     }
-                )
-            }
+                },
+                onPairInit = {
+                    if (store.getRole() == Role.APPROVER) navController.navigate("approver_init")
+                    else navController.navigate("hub_scan")
+                },
+                onDiagnostics = { navController.navigate("diagnostics") }
+            )
+        }
+        composable("approver_init") {
+            ApproverPairingInitScreen(
+                apiClient = apiClient,
+                store = store,
+                onPaired = {
+                    navController.navigate("pairing_home") {
+                        popUpTo("pairing_home") { inclusive = true }
+                    }
+                }
+            )
+        }
+        composable("hub_scan") {
+            HubScanScreen(
+                onScanSuccess = { payload ->
+                    scannedPayload = payload
+                    navController.navigate("hub_offer_details")
+                }
+            )
         }
         composable("hub_offer_details") {
             scannedPayload?.let { payload ->
                 HubOfferDetailsScreen(
                     payload = payload,
-                    onConfirm = {
-                        // TODO: Implement confirmation POST tomorrow
+                    apiClient = apiClient,
+                    store = store,
+                    onPaired = {
+                        navController.navigate("pairing_home") {
+                            popUpTo("pairing_home") { inclusive = true }
+                        }
                     }
                 )
             } ?: Text("Error: No Payload")
+        }
+        composable("diagnostics") {
+            DiagnosticsScreen(
+                store = store,
+                onBack = { navController.navigateUp() }
+            )
         }
     }
 }
