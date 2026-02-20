@@ -35,3 +35,27 @@ This application is built with:
 ## Security Disclaimer
 
 **"Thin client, thick cloud"**: The Pocket Agent relies entirely on the external Cloud Control Plane for state tracking, rate limiting, duplicate protection, and revocation checks. The pocket agent *does not* handle sensitive backend billing operations or API token provisioning directly.
+
+## Deployment & Releases (v0.x)
+
+The project leverages automated **GitHub Releases** matching tags like `v*` (e.g. `v0.3.6`).
+
+### Release Checklist
+Before creating and pushing a new tag, complete the following manually:
+1. Ensure the `versionCode` and `versionName` in `app/build.gradle.kts` are updated strictly monotonically.
+2. Edit `CHANGELOG.md` reflecting the new version exactly as formatted (helps the automated release extractor).
+3. Test locally against the cloud-control-plane.
+4. Push changes (`git commit -m "chore: bump to v0.3.6" && git push`).
+
+### Triggering the Release
+```bash
+git tag v0.3.6
+git push origin v0.3.6
+```
+
+The GitHub Actions workflow `.github/workflows/release.yml` will automatically:
+1. Decode the secure Keystore securely injected via `ANDROID_KEYSTORE_B64`.
+2. Ensure strict `versionCode` increments from prior build configs safely.
+3. Build the `prodRelease` (`app-prod-release.apk`) pointing statically to `https://kilu-control-plane.heizungsrechner.workers.dev`.
+4. Run `sha256sum` generating deterministic hashing via `SHA256SUMS.txt`.
+5. Mount the artifacts to the GitHub Release.

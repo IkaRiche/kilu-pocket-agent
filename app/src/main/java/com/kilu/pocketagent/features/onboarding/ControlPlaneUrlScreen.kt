@@ -5,13 +5,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.kilu.pocketagent.BuildConfig
 import com.kilu.pocketagent.core.storage.DeviceProfileStore
 
 @Composable
 fun ControlPlaneUrlScreen(store: DeviceProfileStore, onComplete: () -> Unit) {
     var url by remember { mutableStateOf(store.getControlPlaneUrl()) }
 
-    val isValid = url.startsWith("https://") || url.startsWith("http://10.0.2.2") || url.startsWith("http://localhost") || url.startsWith("http://192")
+    val isValid = if (BuildConfig.ENFORCE_HTTPS) {
+        url.startsWith("https://")
+    } else {
+        url.startsWith("https://") || url.startsWith("http://")
+    }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("Connect to Control Plane", style = MaterialTheme.typography.headlineMedium)
@@ -24,7 +29,8 @@ fun ControlPlaneUrlScreen(store: DeviceProfileStore, onComplete: () -> Unit) {
             isError = !isValid
         )
         if (!isValid) {
-            Text("Must be https:// (or local http for dev)", color = MaterialTheme.colorScheme.error)
+            val errMsg = if (BuildConfig.ENFORCE_HTTPS) "Production requires https://" else "Must be https:// or http://"
+            Text(errMsg, color = MaterialTheme.colorScheme.error)
         }
         Spacer(modifier = Modifier.weight(1f))
         Button(

@@ -12,17 +12,31 @@ android {
         applicationId = "com.kilu.pocketagent"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 36
+        versionName = "0.3.6"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
         }
     }
 
+    signingConfigs {
+        create("release") {
+            val storeFilePath = System.getenv("KILU_RELEASE_STORE_FILE") ?: project.findProperty("KILU_RELEASE_STORE_FILE")?.toString()
+            if (storeFilePath != null) {
+                storeFile = file(storeFilePath)
+                storePassword = System.getenv("KILU_RELEASE_STORE_PASSWORD") ?: project.findProperty("KILU_RELEASE_STORE_PASSWORD")?.toString()
+                keyAlias = System.getenv("KILU_RELEASE_KEY_ALIAS") ?: project.findProperty("KILU_RELEASE_KEY_ALIAS")?.toString()
+                keyPassword = System.getenv("KILU_RELEASE_KEY_PASSWORD") ?: project.findProperty("KILU_RELEASE_KEY_PASSWORD")?.toString()
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            isDebuggable = false
+            signingConfig = signingConfigs.findByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -34,13 +48,15 @@ android {
             buildConfigField("String", "DEFAULT_CONTROL_PLANE_URL", "\"http://10.0.2.2:8788\"")
             buildConfigField("String", "SERVER_KID", "\"dev_key_1\"")
             buildConfigField("String", "SERVER_PUBKEY_B64", "\"dev_public_key_base64_placeholder_abdsafkjasdflkj\"")
+            buildConfigField("boolean", "ENFORCE_HTTPS", "false")
             applicationIdSuffix = ".dev"
         }
         create("prod") {
             dimension = "environment"
-            buildConfigField("String", "DEFAULT_CONTROL_PLANE_URL", "\"https://api.kilu.network\"")
+            buildConfigField("String", "DEFAULT_CONTROL_PLANE_URL", "\"https://kilu-control-plane.heizungsrechner.workers.dev\"")
             buildConfigField("String", "SERVER_KID", "\"prod_key_1\"")
             buildConfigField("String", "SERVER_PUBKEY_B64", "\"prod_public_key_base64_placeholder_abdsafkjasdflkj\"")
+            buildConfigField("boolean", "ENFORCE_HTTPS", "true")
         }
     }
 
@@ -68,6 +84,7 @@ android {
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-service:2.7.0")
     implementation("androidx.activity:activity-compose:1.8.2")
     implementation(platform("androidx.compose:compose-bom:2024.02.01"))
     implementation("androidx.compose.ui:ui")
