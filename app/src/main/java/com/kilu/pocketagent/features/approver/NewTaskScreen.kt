@@ -39,8 +39,27 @@ fun NewTaskScreen(apiClient: ApiClient, onCreated: (String) -> Unit, onCancel: (
             modifier = Modifier.fillMaxWidth(),
             singleLine = true
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(16.dp))
         Text("Report style is pinned to 'short' for MVP.", style = MaterialTheme.typography.bodySmall)
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // C4: Sample URLs for regression
+        Text("Sample URLs for testing:", style = MaterialTheme.typography.labelMedium)
+        Spacer(modifier = Modifier.height(8.dp))
+        val sampleUrls = listOf(
+            "https://en.wikipedia.org/wiki/Headless_browser",
+            "https://example.com",
+            "https://httpstat.us/403"
+        )
+        sampleUrls.forEach { purl ->
+            TextButton(
+                onClick = { urlInput = purl },
+                contentPadding = PaddingValues(0.dp),
+                modifier = Modifier.defaultMinSize(minHeight = 24.dp)
+            ) {
+                Text(purl, style = MaterialTheme.typography.bodySmall)
+            }
+        }
         
         Spacer(modifier = Modifier.height(16.dp))
         if (errorMsg != null) {

@@ -59,13 +59,27 @@ fun AssumptionResolutionScreen(
         
         Spacer(modifier = Modifier.height(16.dp))
         
-        OutlinedTextField(
-            value = resolutionText,
-            onValueChange = { resolutionText = it },
-            label = { Text("Resolution Directive") },
-            modifier = Modifier.fillMaxWidth(),
-            maxLines = 3
+        Text("Select resolution directive:", style = MaterialTheme.typography.bodyMedium)
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        // C2. 3-Button Action Array
+        val actions = listOf(
+            "Proceed (Bypass Warning)", 
+            "Try Alternative Page", 
+            "Stop Execution (Fail Task)"
         )
+        actions.forEach { actionLabel ->
+            OutlinedButton(
+                onClick = { resolutionText = actionLabel },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = if (resolutionText == actionLabel) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+                )
+            ) {
+                Text(actionLabel)
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+        }
         
         Spacer(modifier = Modifier.weight(1f))
         

@@ -26,19 +26,21 @@ import okhttp3.RequestBody.Companion.toRequestBody
 @Composable
 fun HubDashboardScreen(apiClient: ApiClient, onSessionInvalid: () -> Unit) {
     var queue by remember { mutableStateOf<List<HubQueueResponse>>(emptyList()) }
-    var statusText by remember { mutableStateOf<String?>(null) }
     var isPolling by remember { mutableStateOf(false) }
-    
+    var errorMsg by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val jsonParser = Json { ignoreUnknownKeys = true }
+    
+    // B4. Local cache to prevent double assumptions packet
+    val escalatedTasks = remember { mutableStateListOf<String>() }
 
     fun pollQueue() {
         scope.launch {
             isPolling = true
-            statusText = "Polling /v1/hub/queue..."
+            errorMsg = null
             try {
                 val req = Request.Builder()
-                    .url("\${apiClient.getBaseUrl()}/v1/hub/queue?max=5")
+                    .url("${apiClient.getBaseUrl()}/v1/hub/queue?max=5")
                     .get()
                     .build()
                 val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }
@@ -46,139 +48,185 @@ fun HubDashboardScreen(apiClient: ApiClient, onSessionInvalid: () -> Unit) {
                 if (resp.isSuccessful) {
                     val bodyStr = resp.body?.string() ?: "[]"
                     queue = jsonParser.decodeFromString<List<HubQueueResponse>>(bodyStr)
-                    statusText = "Found \${queue.size} tasks in queue."
                 } else if (resp.code == 401 || resp.code == 403) {
-                    statusText = "Session generic failure. Re-pairing needed."
                     onSessionInvalid()
-                } else if (resp.code == 429) {
-                    statusText = "Rate limited, retry later."
                 } else {
-                    statusText = "Poll Error: \${ErrorHandler.parseError(resp)}"
+                    errorMsg = ErrorHandler.parseError(resp)
                 }
             } catch(e: Exception) {
-                statusText = "Network Error: \${e.message}"
+                errorMsg = e.message
             } finally {
                 isPolling = false
             }
         }
     }
 
+    LaunchedEffect(Unit) { pollQueue() }
+
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("Hub Dashboard", style = MaterialTheme.typography.headlineMedium)
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Button(onClick = { pollQueue() }, enabled = !isPolling, modifier = Modifier.fillMaxWidth()) {
-            Text(if (isPolling) "Polling..." else "Poll Queue")
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Hub Dashboard", style = MaterialTheme.typography.headlineMedium)
+            IconButton(onClick = { pollQueue() }, enabled = !isPolling) {
+                Text("\uD83D\uDD04")
+            }
         }
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        if (statusText != null) {
-            Text(statusText!!, color = MaterialTheme.colorScheme.primary)
-        }
-        
+        Text("Waiting for remote tasks...", style = MaterialTheme.typography.bodyMedium)
         Spacer(modifier = Modifier.height(16.dp))
-        
+
+        if (errorMsg != null) {
+            Text("Error: $errorMsg", color = MaterialTheme.colorScheme.error)
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
         LazyColumn(modifier = Modifier.weight(1f)) {
             items(queue) { task ->
-                HubTaskCard(task, apiClient, jsonParser) {
-                    // Refresh after stub run
-                    pollQueue()
-                }
+                HubTaskCard(
+                    task = task, 
+                    apiClient = apiClient, 
+                    jsonParser = jsonParser, 
+                    hasEscalated = escalatedTasks.contains(task.task_id),
+                    onEscalate = { escalatedTasks.add(task.task_id) },
+                    onCompleted = { pollQueue() }
+                )
                 Spacer(modifier = Modifier.height(8.dp))
             }
             if (queue.isEmpty() && !isPolling) {
-                item {
-                    Text("No tasks currently leased.", style = MaterialTheme.typography.bodyLarge)
-                }
+                item { Text("Queue is empty. Active background leasing disabled for MVP v0.") }
             }
         }
     }
 }
 
+// C1: Hub UX states 
+enum class HubTaskState {
+    IDLE, RUNNING, WAITING_APPROVER, DONE, FAILED
+}
+
 @Composable
-fun HubTaskCard(task: HubQueueResponse, apiClient: ApiClient, jsonParser: Json, onCompleted: () -> Unit) {
-    var isExecuting by remember { mutableStateOf(false) }
+fun HubTaskCard(task: HubQueueResponse, apiClient: ApiClient, jsonParser: Json, hasEscalated: Boolean, onEscalate: () -> Unit, onCompleted: () -> Unit) {
+    var taskState by remember { mutableStateOf(if (hasEscalated) HubTaskState.WAITING_APPROVER else HubTaskState.IDLE) }
     var execResult by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Task: \${task.task_id}", style = MaterialTheme.typography.titleMedium)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Task: ${task.task_id.take(8)}", style = MaterialTheme.typography.titleMedium)
+                Text(taskState.name, color = when(taskState) {
+                    HubTaskState.RUNNING -> MaterialTheme.colorScheme.primary
+                    HubTaskState.WAITING_APPROVER -> MaterialTheme.colorScheme.error
+                    HubTaskState.DONE -> MaterialTheme.colorScheme.secondary
+                    HubTaskState.FAILED -> MaterialTheme.colorScheme.error
+                    HubTaskState.IDLE -> MaterialTheme.colorScheme.onSurfaceVariant
+                }, style = MaterialTheme.typography.labelMedium)
+            }
             Spacer(modifier = Modifier.height(4.dp))
-            Text("URL: \${task.external_url}", style = MaterialTheme.typography.bodyMedium)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text("Lease Expires: \${task.expires_at}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            Text("URL: ${task.external_url}", style = MaterialTheme.typography.bodyMedium)
+            
+            if (taskState == HubTaskState.IDLE || taskState == HubTaskState.RUNNING) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("Lease Expires: ${task.expires_at}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            }
             
             Spacer(modifier = Modifier.height(12.dp))
             
             if (execResult != null) {
-                Text(execResult!!, color = MaterialTheme.colorScheme.primary)
-            } else {
+                Text(execResult!!, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                Spacer(modifier = Modifier.height(8.dp))
+            } 
+            
+            if (taskState == HubTaskState.IDLE) {
                 Button(
                     onClick = {
-                        isExecuting = true
+                        taskState = HubTaskState.RUNNING
                         scope.launch(Dispatchers.IO) {
+                            var executor: com.kilu.pocketagent.core.hub.web.WebViewExecutor? = null
                             try {
                                 // 1. Mint Stub Batch (Still needed per protocol)
                                 val mintReq = Request.Builder()
-                                    .url("\${apiClient.getBaseUrl()}/v1/grants/\${task.grant_id}/mint-step-batch")
+                                    .url("${apiClient.getBaseUrl()}/v1/grants/${task.grant_id}/mint-step-batch")
                                     .post(jsonParser.encodeToString(MintStepBatchReq(1)).toByteArray().toRequestBody("application/json".toMediaType()))
                                     .build()
                                 
                                 val mResp = apiClient.client.newCall(mintReq).execute()
+                                
+                                // B3. Halt on explicit mint failure explicitly before spinning up WebView 
                                 if (!mResp.isSuccessful) {
-                                    execResult = "Mint failed: \${ErrorHandler.parseError(mResp)}"
+                                    execResult = "Mint failed (${mResp.code}): ${ErrorHandler.parseError(mResp)}"
+                                    taskState = HubTaskState.FAILED
                                     return@launch
                                 }
                                 
                                 // 2. Init Headless WebView
-                                val executor = com.kilu.pocketagent.core.hub.web.WebViewExecutor(context)
+                                executor = com.kilu.pocketagent.core.hub.web.WebViewExecutor(context)
                                 executor.initialize()
                                 
                                 // 3. Load URL + Catch Native Network/Timeout Errors
-                                val loadRes = executor.loadUrl(task.external_url, timeoutMs = 20000)
+                                val loadRes = executor.loadUrl(task.external_url, pageLoadTimeoutMs = 15000, domReadyTimeoutMs = 5000)
                                 if (loadRes.isFailure) {
                                     val escalateMsg = loadRes.exceptionOrNull()?.message ?: "Unknown load error"
-                                    triggerAssumptions(apiClient, task.task_id, jsonParser, "page_load_failed", escalateMsg)
-                                    execResult = "Escalated: Load Failed"
-                                    onCompleted()
+                                    if (!hasEscalated) {
+                                        triggerAssumptions(apiClient, task.task_id, jsonParser, "page_load_failed", escalateMsg)
+                                        execResult = "Escalated: Load Failed"
+                                        onEscalate()
+                                    } else {
+                                        execResult = "Blocked: Load failed again natively. Waiting on Approver."
+                                    }
+                                    taskState = HubTaskState.WAITING_APPROVER
                                     return@launch
                                 }
 
                                 // 4. Evaluate Heuristics (Paywall/Captcha)
-                                val heuristics = executor.evaluateJavascript(com.kilu.pocketagent.core.hub.web.WebExtractScripts.CHECK_HEURISTICS)
+                                val heuristics = executor.evaluateJavascript(com.kilu.pocketagent.core.hub.web.WebExtractScripts.CHECK_HEURISTICS, jsEvalTimeoutMs = 3000)
                                 if (heuristics.isNotEmpty() && heuristics != "null" && heuristics.isNotBlank()) {
-                                    triggerAssumptions(apiClient, task.task_id, jsonParser, "security_heuristic", heuristics)
-                                    execResult = "Escalated: Security Check Triggered"
-                                    onCompleted()
+                                    if (!hasEscalated) {
+                                        triggerAssumptions(apiClient, task.task_id, jsonParser, "security_heuristic", heuristics)
+                                        execResult = "Escalated: Security Check Triggered"
+                                        onEscalate()
+                                    } else {
+                                        execResult = "Blocked: Security check persists. Waiting on Approver."
+                                    }
+                                    taskState = HubTaskState.WAITING_APPROVER
                                     return@launch
                                 }
 
-                                // 5. Safe Execute Extractions
-                                val paragraphs = executor.evaluateJavascript(com.kilu.pocketagent.core.hub.web.WebExtractScripts.EXTRACT_PARAGRAPHS)
-                                val rawHeadingsStr = executor.evaluateJavascript(com.kilu.pocketagent.core.hub.web.WebExtractScripts.EXTRACT_HEADINGS)
+                                // 5. Safe Execute Extractions (Bounded by jsEvalTimeout)
+                                val paragraphs = executor.evaluateJavascript(com.kilu.pocketagent.core.hub.web.WebExtractScripts.EXTRACT_PARAGRAPHS, jsEvalTimeoutMs = 3000)
+                                val rawHeadingsStr = executor.evaluateJavascript(com.kilu.pocketagent.core.hub.web.WebExtractScripts.EXTRACT_HEADINGS, jsEvalTimeoutMs = 3000)
                                 
                                 // Cleanup JS output bounds
                                 val parsedHeadings = try {
                                     jsonParser.decodeFromString<List<String>>(rawHeadingsStr)
                                 } catch (_: Exception) { emptyList() }
                                 
-                                // Clean up the extracted text properly to avoid raw eval escaping artifacts
                                 val safeText = paragraphs.replace("\\\\n", "\n").replace("\\\\\"", "\"").trim()
+
+                                // A4. Extraction Guards
+                                if (safeText.length < 200 && parsedHeadings.isEmpty()) {
+                                    if (!hasEscalated) {
+                                        triggerAssumptions(apiClient, task.task_id, jsonParser, "extraction_blocked", "DOM loaded but no meaningful paragraphs or headings extracted. Site may be an unsupported SPA or actively blocking bots.")
+                                        execResult = "Escalated: Empty Extraction Guard Triggered"
+                                        onEscalate()
+                                    } else {
+                                         execResult = "Blocked: Extraction still empty. Waiting on Approver."
+                                    }
+                                    taskState = HubTaskState.WAITING_APPROVER
+                                    return@launch
+                                }
 
                                 // 6. Evidence Hashing
                                 val textHashHex = com.kilu.pocketagent.core.crypto.DigestUtil.sha256Hex(safeText)
                                 val headingsHashHex = com.kilu.pocketagent.core.crypto.DigestUtil.sha256Hex(parsedHeadings.joinToString("|"))
 
                                 val hashObj = JsonObject(mapOf(
-                                    "text_hash" to kotlinx.serialization.json.JsonPrimitive("sha256:\$textHashHex"),
-                                    "headings_hash" to kotlinx.serialization.json.JsonPrimitive("sha256:\$headingsHashHex")
+                                    "text_hash" to kotlinx.serialization.json.JsonPrimitive("sha256:$textHashHex"),
+                                    "headings_hash" to kotlinx.serialization.json.JsonPrimitive("sha256:$headingsHashHex")
                                 ))
 
                                 // 7. Deterministic Report Builder
-                                val autoSummary = "Successfully extracted \${safeText.length} characters and \${parsedHeadings.size} headings from \${task.external_url} via Headless Edge WebView execution."
-                                val facts = parsedHeadings.take(5).map { "Heading Extracted: \$it" }
+                                val autoSummary = "Successfully extracted ${safeText.length} characters and ${parsedHeadings.size} headings from ${task.external_url} via Headless Edge WebView execution."
+                                val facts = parsedHeadings.take(5).map { "Heading Extracted: $it" }
 
                                 // 8. Submit Final Result
                                 val resPayload = SubmitResultReq(
@@ -191,28 +239,56 @@ fun HubTaskCard(task: HubQueueResponse, apiClient: ApiClient, jsonParser: Json, 
                                 )
                                 
                                 val pubReq = Request.Builder()
-                                    .url("\${apiClient.getBaseUrl()}/v1/tasks/\${task.task_id}/result")
+                                    .url("${apiClient.getBaseUrl()}/v1/tasks/${task.task_id}/result")
                                     .post(jsonParser.encodeToString(resPayload).toByteArray().toRequestBody("application/json".toMediaType()))
                                     .build()
                                     
                                 val pubResp = apiClient.client.newCall(pubReq).execute()
-                                if (pubResp.isSuccessful) {
+                                
+                                // B2: Idempotency check 
+                                if (pubResp.isSuccessful || pubResp.code == 409) {
                                     execResult = "Execution Result Delivered!"
-                                    onCompleted()
+                                    taskState = HubTaskState.DONE
+                                    withContext(Dispatchers.Main) { onCompleted() }
                                 } else {
-                                    execResult = "Submit Failed: \${ErrorHandler.parseError(pubResp)}"
+                                    execResult = "Submit Failed (${pubResp.code}): ${ErrorHandler.parseError(pubResp)}"
+                                    taskState = HubTaskState.FAILED
                                 }
                             } catch (e: Exception) {
-                                execResult = "Crash: \${e.message}"
+                                execResult = "Crash: ${e.message}"
+                                taskState = HubTaskState.FAILED
                             } finally {
-                                isExecuting = false
+                                executor?.destroy()
+                                if (taskState == HubTaskState.RUNNING) {
+                                    // Fallback to FAILED if unhandled interrupt
+                                    taskState = HubTaskState.FAILED 
+                                }
+                            }
+                        }
+                        
+                        // B1. Lease refresh heartbeat logic
+                        scope.launch(Dispatchers.IO) {
+                            while(taskState == HubTaskState.RUNNING) {
+                                delay(30_000)
+                                if (taskState == HubTaskState.RUNNING) {
+                                    try {
+                                        val req = Request.Builder()
+                                            .url("${apiClient.getBaseUrl()}/v1/hub/lease/refresh")
+                                            .post("{\"task_id\":\"${task.task_id}\"}".toRequestBody("application/json".toMediaType()))
+                                            .build()
+                                        apiClient.client.newCall(req).execute()
+                                    } catch(e: Exception) { }
+                                }
                             }
                         }
                     }, 
-                    enabled = !isExecuting,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(if (isExecuting) "Running..." else "Run Extract Loop")
+                    Text("Run Extract Loop")
+                }
+            } else if (taskState == HubTaskState.WAITING_APPROVER) {
+                Button(onClick = { /* Wait for polling sync */ }, enabled = false, modifier = Modifier.fillMaxWidth()) {
+                    Text("Escalated: Check Approver Inbox")
                 }
             }
         }

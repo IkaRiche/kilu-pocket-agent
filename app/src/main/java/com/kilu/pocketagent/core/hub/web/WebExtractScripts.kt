@@ -48,6 +48,7 @@ object WebExtractScripts {
      * Evaluates security heuristics locally in DOM.
      * Returns a non-empty string giving the reason if a trigger is hit.
      * Returns empty string if safe.
+     * A5: False-positive prevention.
      */
     val CHECK_HEURISTICS = """
         (function() {
@@ -55,10 +56,9 @@ object WebExtractScripts {
                 return "Found password input field";
             }
             
-            // Check for captcha in visible text (simplified)
-            let bodyText = (document.body.innerText || "").toLowerCase();
-            if (bodyText.includes("captcha")) {
-                return "Found captcha keyword in page text";
+            // Check for actual captcha iframes/widgets, not just text
+            if (document.querySelector('iframe[src*="recaptcha"]， iframe[src*="hcaptcha"]， div[class*="g-recaptcha"]')) {
+                return "Found active CAPTCHA widget";
             }
             
             let dangerousKeywords = ["paywall", "subscribe", "login", "auth"];
@@ -69,8 +69,10 @@ object WebExtractScripts {
                 let cls = (el.className || "").toString().toLowerCase();
                 
                 for (let d of dangerousKeywords) {
-                    if (id.includes(d) || cls.includes(d)) {
-                        return "Matched dangerous class/id: " + d;
+                    // Ensure it's not a false positive link or styling name just coincidentally matching
+                    if ((id === d || id.includes("-" + d) || id.includes(d + "-")) ||
+                        (cls.includes(" " + d + " ") || cls.startsWith(d + " ") || cls.endsWith(" " + d))) {
+                        return "Matched dangerous structural class/id: " + d;
                     }
                 }
             }

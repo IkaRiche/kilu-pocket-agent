@@ -42,7 +42,8 @@ fun ApproverInboxScreen(apiClient: ApiClient, onResolveRequested: (String) -> Un
                 
                 if (resp.isSuccessful) {
                     val bodyStr = resp.body?.string() ?: "[]"
-                    episodes = jsonParser.decodeFromString<List<InboxEpisode>>(bodyStr)
+                    val rawEvents = jsonParser.decodeFromString<List<InboxEpisode>>(bodyStr)
+                    episodes = rawEvents.distinctBy { it.episode_id }
                 } else {
                     errorMsg = ErrorHandler.parseError(resp)
                 }
