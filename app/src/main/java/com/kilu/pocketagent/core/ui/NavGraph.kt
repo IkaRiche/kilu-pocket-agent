@@ -132,6 +132,20 @@ fun NavGraph() {
         composable("approver_inbox") {
             com.kilu.pocketagent.features.approver.ApproverInboxScreen(
                 apiClient = apiClient,
+                onResolveRequested = { taskId ->
+                    navController.navigate("approver_resolve/\$taskId")
+                },
+                onBack = { navController.navigateUp() }
+            )
+        }
+        composable("approver_resolve/{taskId}") { backStackEntry ->
+            val tId = backStackEntry.arguments?.getString("taskId") ?: ""
+            com.kilu.pocketagent.features.approver.AssumptionResolutionScreen(
+                taskId = tId,
+                apiClient = apiClient,
+                onResolved = {
+                    navController.navigateUp()
+                },
                 onBack = { navController.navigateUp() }
             )
         }

@@ -21,7 +21,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
 @Composable
-fun ApproverInboxScreen(apiClient: ApiClient, onBack: () -> Unit) {
+fun ApproverInboxScreen(apiClient: ApiClient, onResolveRequested: (String) -> Unit, onBack: () -> Unit) {
     var episodes by remember { mutableStateOf<List<InboxEpisode>>(emptyList()) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
@@ -74,7 +74,7 @@ fun ApproverInboxScreen(apiClient: ApiClient, onBack: () -> Unit) {
         } else {
             LazyColumn(modifier = Modifier.weight(1f)) {
                 items(episodes) { ep ->
-                    InboxCard(ep, apiClient, jsonParser) { loadInbox() }
+                    InboxCard(ep, apiClient, jsonParser, onAcked = { loadInbox() }, onResolveRequested = onResolveRequested)
                     Spacer(modifier = Modifier.height(8.dp))
                 }
                 if (episodes.isEmpty()) {
@@ -91,14 +91,19 @@ fun ApproverInboxScreen(apiClient: ApiClient, onBack: () -> Unit) {
 }
 
 @Composable
-fun InboxCard(ep: InboxEpisode, apiClient: ApiClient, jsonParser: Json, onAcked: () -> Unit) {
+fun InboxCard(ep: InboxEpisode, apiClient: ApiClient, jsonParser: Json, onAcked: () -> Unit, onResolveRequested: ((String) -> Unit)? = null) {
     var isExpanded by remember { mutableStateOf(false) }
+    var rawExpanded by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(ep.event_type, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                Text(
+                    ep.event_type.replace("_", " "), 
+                    style = MaterialTheme.typography.titleMedium, 
+                    color = if (ep.event_type == "RESULT_READY") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                )
                 if (ep.requires_ack) Text("NEW", color = MaterialTheme.colorScheme.error)
             }
             Text("Task: \${ep.task_id.take(8)}...", style = MaterialTheme.typography.bodySmall)
@@ -110,14 +115,23 @@ fun InboxCard(ep: InboxEpisode, apiClient: ApiClient, jsonParser: Json, onAcked:
                 if (ep.event_type == "RESULT_READY") {
                     try {
                         val resultView = jsonParser.decodeFromJsonElement<ResultPayloadView>(ep.payload.getValue("result"))
-                        Text("Source: \${resultView.url}", style = MaterialTheme.typography.bodyMedium)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("Summary: \${resultView.summary}", style = MaterialTheme.typography.bodyMedium)
+                        Text("Source: \${resultView.url}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(resultView.extracted_text, style = MaterialTheme.typography.bodySmall, maxLines = 10)
+                        Text(resultView.summary, style = MaterialTheme.typography.bodyLarge)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        TextButton(onClick = { rawExpanded = !rawExpanded }) {
+                            Text(if (rawExpanded) "Hide Raw Extraction" else "Show Raw Extraction")
+                        }
+                        
+                        if (rawExpanded) {
+                            Text(resultView.extracted_text, style = MaterialTheme.typography.bodySmall, maxLines = 15)
+                        }
                     } catch (e: Exception) {
                         Text("Failed to parse result details.", color = MaterialTheme.colorScheme.error)
                     }
+                } else if (ep.event_type == "ASSUMPTIONS_REQUIRED") {
+                    Text("The task execution was blocked. Please resolve to continue.", style = MaterialTheme.typography.bodyMedium)
                 } else {
                     Text(ep.payload.toString(), style = MaterialTheme.typography.bodySmall)
                 }
@@ -125,26 +139,41 @@ fun InboxCard(ep: InboxEpisode, apiClient: ApiClient, jsonParser: Json, onAcked:
             
             if (ep.requires_ack) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Button(onClick = {
-                    scope.launch {
-                        try {
-                            val req = Request.Builder()
-                                .url("\${apiClient.getBaseUrl()}/v1/inbox/ack")
-                                .post("{\"episode_id\":\"\${ep.episode_id}\"}".toRequestBody("application/json".toMediaType()))
-                                .build()
-                            val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }
-                            if (resp.isSuccessful) {
-                                isExpanded = true
-                                onAcked()
-                            }
-                        } catch (e: Exception) { }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = {
+                        scope.launch {
+                            try {
+                                val req = Request.Builder()
+                                    .url("\${apiClient.getBaseUrl()}/v1/inbox/ack")
+                                    .post("{\"episode_id\":\"\${ep.episode_id}\"}".toRequestBody("application/json".toMediaType()))
+                                    .build()
+                                val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }
+                                if (resp.isSuccessful) {
+                                    isExpanded = true
+                                    onAcked()
+                                }
+                            } catch (e: Exception) { }
+                        }
+                    }) {
+                        Text("Acknowledge")
                     }
-                }) {
-                    Text("Read & Acknowledge")
+                    
+                    if (ep.event_type == "ASSUMPTIONS_REQUIRED" && onResolveRequested != null) {
+                        OutlinedButton(onClick = { onResolveRequested(ep.task_id) }) {
+                            Text("Resolve")
+                        }
+                    }
                 }
             } else {
-                TextButton(onClick = { isExpanded = !isExpanded }) {
-                    Text(if (isExpanded) "Hide Details" else "View Details")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { isExpanded = !isExpanded }) {
+                        Text(if (isExpanded) "Hide Details" else "View Details")
+                    }
+                    if (ep.event_type == "ASSUMPTIONS_REQUIRED" && onResolveRequested != null) {
+                        TextButton(onClick = { onResolveRequested(ep.task_id) }) {
+                            Text("Resolve Issues")
+                        }
+                    }
                 }
             }
         }

@@ -100,6 +100,7 @@ fun HubTaskCard(task: HubQueueResponse, apiClient: ApiClient, jsonParser: Json, 
     var isExecuting by remember { mutableStateOf(false) }
     var execResult by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -117,26 +118,76 @@ fun HubTaskCard(task: HubQueueResponse, apiClient: ApiClient, jsonParser: Json, 
                 Button(
                     onClick = {
                         isExecuting = true
-                        scope.launch {
+                        scope.launch(Dispatchers.IO) {
                             try {
-                                // 1. Mint Stub Batch
+                                // 1. Mint Stub Batch (Still needed per protocol)
                                 val mintReq = Request.Builder()
                                     .url("\${apiClient.getBaseUrl()}/v1/grants/\${task.grant_id}/mint-step-batch")
                                     .post(jsonParser.encodeToString(MintStepBatchReq(1)).toByteArray().toRequestBody("application/json".toMediaType()))
                                     .build()
                                 
-                                val mResp = withContext(Dispatchers.IO) { apiClient.client.newCall(mintReq).execute() }
+                                val mResp = apiClient.client.newCall(mintReq).execute()
                                 if (!mResp.isSuccessful) {
                                     execResult = "Mint failed: \${ErrorHandler.parseError(mResp)}"
                                     return@launch
                                 }
                                 
-                                // 2. Stub Result parsing
+                                // 2. Init Headless WebView
+                                val executor = com.kilu.pocketagent.core.hub.web.WebViewExecutor(context)
+                                executor.initialize()
+                                
+                                // 3. Load URL + Catch Native Network/Timeout Errors
+                                val loadRes = executor.loadUrl(task.external_url, timeoutMs = 20000)
+                                if (loadRes.isFailure) {
+                                    val escalateMsg = loadRes.exceptionOrNull()?.message ?: "Unknown load error"
+                                    triggerAssumptions(apiClient, task.task_id, jsonParser, "page_load_failed", escalateMsg)
+                                    execResult = "Escalated: Load Failed"
+                                    onCompleted()
+                                    return@launch
+                                }
+
+                                // 4. Evaluate Heuristics (Paywall/Captcha)
+                                val heuristics = executor.evaluateJavascript(com.kilu.pocketagent.core.hub.web.WebExtractScripts.CHECK_HEURISTICS)
+                                if (heuristics.isNotEmpty() && heuristics != "null" && heuristics.isNotBlank()) {
+                                    triggerAssumptions(apiClient, task.task_id, jsonParser, "security_heuristic", heuristics)
+                                    execResult = "Escalated: Security Check Triggered"
+                                    onCompleted()
+                                    return@launch
+                                }
+
+                                // 5. Safe Execute Extractions
+                                val paragraphs = executor.evaluateJavascript(com.kilu.pocketagent.core.hub.web.WebExtractScripts.EXTRACT_PARAGRAPHS)
+                                val rawHeadingsStr = executor.evaluateJavascript(com.kilu.pocketagent.core.hub.web.WebExtractScripts.EXTRACT_HEADINGS)
+                                
+                                // Cleanup JS output bounds
+                                val parsedHeadings = try {
+                                    jsonParser.decodeFromString<List<String>>(rawHeadingsStr)
+                                } catch (_: Exception) { emptyList() }
+                                
+                                // Clean up the extracted text properly to avoid raw eval escaping artifacts
+                                val safeText = paragraphs.replace("\\\\n", "\n").replace("\\\\\"", "\"").trim()
+
+                                // 6. Evidence Hashing
+                                val textHashHex = com.kilu.pocketagent.core.crypto.DigestUtil.sha256Hex(safeText)
+                                val headingsHashHex = com.kilu.pocketagent.core.crypto.DigestUtil.sha256Hex(parsedHeadings.joinToString("|"))
+
+                                val hashObj = JsonObject(mapOf(
+                                    "text_hash" to kotlinx.serialization.json.JsonPrimitive("sha256:\$textHashHex"),
+                                    "headings_hash" to kotlinx.serialization.json.JsonPrimitive("sha256:\$headingsHashHex")
+                                ))
+
+                                // 7. Deterministic Report Builder
+                                val autoSummary = "Successfully extracted \${safeText.length} characters and \${parsedHeadings.size} headings from \${task.external_url} via Headless Edge WebView execution."
+                                val facts = parsedHeadings.take(5).map { "Heading Extracted: \$it" }
+
+                                // 8. Submit Final Result
                                 val resPayload = SubmitResultReq(
                                     url = task.external_url,
-                                    extracted_text = "Stub extraction from \${task.external_url} based on Hub Day 3 MVP requirements.",
-                                    summary = "Automated Stub Report executed seamlessly by the Android HUB edge node API.",
-                                    hashes = JsonObject(emptyMap())
+                                    extracted_text = safeText,
+                                    summary = autoSummary,
+                                    headings = parsedHeadings,
+                                    facts = facts,
+                                    hashes = hashObj
                                 )
                                 
                                 val pubReq = Request.Builder()
@@ -144,14 +195,13 @@ fun HubTaskCard(task: HubQueueResponse, apiClient: ApiClient, jsonParser: Json, 
                                     .post(jsonParser.encodeToString(resPayload).toByteArray().toRequestBody("application/json".toMediaType()))
                                     .build()
                                     
-                                val pubResp = withContext(Dispatchers.IO) { apiClient.client.newCall(pubReq).execute() }
+                                val pubResp = apiClient.client.newCall(pubReq).execute()
                                 if (pubResp.isSuccessful) {
-                                    execResult = "Stub Execution Complete!"
+                                    execResult = "Execution Result Delivered!"
                                     onCompleted()
                                 } else {
-                                    execResult = "Result Submit Failed: \${ErrorHandler.parseError(pubResp)}"
+                                    execResult = "Submit Failed: \${ErrorHandler.parseError(pubResp)}"
                                 }
-
                             } catch (e: Exception) {
                                 execResult = "Crash: \${e.message}"
                             } finally {
@@ -162,9 +212,26 @@ fun HubTaskCard(task: HubQueueResponse, apiClient: ApiClient, jsonParser: Json, 
                     enabled = !isExecuting,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(if (isExecuting) "Running..." else "Run (stub)")
+                    Text(if (isExecuting) "Running..." else "Run Extract Loop")
                 }
             }
         }
+    }
+}
+
+suspend fun triggerAssumptions(apiClient: ApiClient, taskId: String, json: Json, key: String, reason: String) {
+    try {
+        val payload = RequestAssumptionsReq(
+            assumptions = listOf(
+                com.kilu.pocketagent.shared.models.AssumptionItemReq(key, "Execution blocked by heuristic: \$reason. Proceed manually?")
+            )
+        )
+        val req = Request.Builder()
+            .url("\${apiClient.getBaseUrl()}/v1/tasks/\$taskId/assumptions/request")
+            .post(json.encodeToString(payload).toByteArray().toRequestBody("application/json".toMediaType()))
+            .build()
+        apiClient.client.newCall(req).execute()
+    } catch (e: Exception) {
+        // Log or silently fail escalation bounds
     }
 }

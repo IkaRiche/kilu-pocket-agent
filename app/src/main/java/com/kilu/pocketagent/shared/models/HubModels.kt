@@ -36,3 +36,14 @@ data class SubmitResultReq(
     val facts: List<String> = emptyList(),
     val hashes: JsonObject
 )
+
+@Serializable
+data class AssumptionItemReq(
+    val key: String,
+    val question: String
+)
+
+@Serializable
+data class RequestAssumptionsReq(
+    val assumptions: List<AssumptionItemReq>
+)
