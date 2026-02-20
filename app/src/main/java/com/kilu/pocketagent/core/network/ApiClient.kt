@@ -1,5 +1,6 @@
 package com.kilu.pocketagent.core.network
 
+import com.kilu.pocketagent.BuildConfig
 import com.kilu.pocketagent.core.storage.DeviceProfileStore
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
@@ -20,5 +21,16 @@ class ApiClient(private val store: DeviceProfileStore) {
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    fun getBaseUrl(): String = store.getControlPlaneUrl()
+    fun getBaseUrl(): String {
+        val raw = store.getControlPlaneUrl()
+        var normalized = raw.trimEnd('/')
+        if (!normalized.endsWith("/v1")) {
+            normalized += "/v1"
+        }
+        
+        if (BuildConfig.FLAVOR == "prod" && !normalized.startsWith("https://")) {
+            throw IllegalStateException("Prod flavor requires https:// scheme!")
+        }
+        return normalized
+    }
 }

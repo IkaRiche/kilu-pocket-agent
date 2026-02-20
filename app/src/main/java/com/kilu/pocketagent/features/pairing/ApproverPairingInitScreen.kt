@@ -84,7 +84,7 @@ fun ApproverPairingInitScreen(apiClient: ApiClient, store: DeviceProfileStore, o
                                 store.setSessionToken(data.device_session_token)
                                 onPaired()
                             } else {
-                                errorMsg = "Confirm failed: ${resp.code} ${resp.body?.string()}"
+                                errorMsg = com.kilu.pocketagent.shared.utils.ErrorHandler.parseError(resp)
                             }
                         } catch (e: Exception) {
                             errorMsg = "Confirm caught: ${e.message}"
@@ -123,12 +123,14 @@ fun ApproverPairingInitScreen(apiClient: ApiClient, store: DeviceProfileStore, o
                         cp = apiClient.getBaseUrl(),
                         t = data.pairing_token,
                         h = data.offer_core_hash,
-                        e = data.expires_at
+                        e = data.expires_at,
+                        ss = data.server_sig,
+                        kid = BuildConfig.SERVER_KID
                     )
                     val jsonStr = jsonParser.encodeToString(payload)
                     qrBitmap = QrGenerator.generate(jsonStr)
                 } else {
-                    errorMsg = "Server error ${resp.code}: ${resp.body?.string()}"
+                    errorMsg = com.kilu.pocketagent.shared.utils.ErrorHandler.parseError(resp)
                 }
             } catch (e: Exception) {
                 errorMsg = "Cannot reach control plane: ${e.message}"

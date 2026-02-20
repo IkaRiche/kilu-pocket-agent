@@ -7,7 +7,9 @@ data class QRPayload(
     val cp: String,
     val t: String,
     val h: String,
-    val e: String
+    val e: String,
+    val ss: String? = null,
+    val kid: String? = null
 )
 
 @Serializable
@@ -52,4 +54,10 @@ data class HubConfirmResp(
     val runtime_id: String,
     val toolchain_id: String,
     val hub_session_token: String
+)
+
+@Serializable
+data class ErrorEnvelope(
+    val error: String,
+    val message: String? = null
 )

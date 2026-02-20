@@ -1,8 +1,7 @@
 package com.kilu.pocketagent.core.ui
 
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -26,7 +25,7 @@ fun NavGraph() {
     val context = LocalContext.current
     val store = remember { DeviceProfileStore(context) }
     val apiClient = remember { ApiClient(store) }
-    var scannedPayload: QRPayload? = null
+    var scannedPayload by remember { mutableStateOf<QRPayload?>(null) }
     
     val startDestination = if (store.getRole() == null) "welcome" else "pairing_home"
 
@@ -51,20 +50,49 @@ fun NavGraph() {
             )
         }
         composable("pairing_home") {
-            PairingHomeScreen(
-                store = store,
-                apiClient = apiClient,
-                onChangeRole = {
-                    navController.navigate("role_select") {
-                        popUpTo("pairing_home") { inclusive = true }
+            if (store.getRole() == Role.HUB && store.getSessionToken() != null) {
+                com.kilu.pocketagent.features.hub.HubDashboardScreen(
+                    apiClient = apiClient,
+                    onSessionInvalid = {
+                        store.clearPairing()
+                        navController.navigate("pairing_home") {
+                            popUpTo("pairing_home") { inclusive = true }
+                        }
                     }
-                },
-                onPairInit = {
-                    if (store.getRole() == Role.APPROVER) navController.navigate("approver_init")
-                    else navController.navigate("hub_scan")
-                },
-                onDiagnostics = { navController.navigate("diagnostics") }
-            )
+                )
+            } else if (store.getRole() == Role.APPROVER && store.getSessionToken() != null) {
+                com.kilu.pocketagent.features.approver.ApproverTasksHomeScreen(
+                    apiClient = apiClient,
+                    onSessionInvalid = {
+                        store.clearPairing()
+                        navController.navigate("pairing_home") {
+                            popUpTo("pairing_home") { inclusive = true }
+                        }
+                    },
+                    onNewTaskClick = { navController.navigate("approver_new_task") },
+                    onTaskClick = { taskId, status -> 
+                        if (status == "NEEDS_PLAN_APPROVAL") {
+                            navController.navigate("approver_plan/\$taskId")
+                        }
+                    },
+                    onInboxClick = { navController.navigate("approver_inbox") }
+                )
+            } else {
+                PairingHomeScreen(
+                    store = store,
+                    apiClient = apiClient,
+                    onChangeRole = {
+                        navController.navigate("role_select") {
+                            popUpTo("pairing_home") { inclusive = true }
+                        }
+                    },
+                    onPairInit = {
+                        if (store.getRole() == Role.APPROVER) navController.navigate("approver_init")
+                        else navController.navigate("hub_scan")
+                    },
+                    onDiagnostics = { navController.navigate("diagnostics") }
+                )
+            }
         }
         composable("approver_init") {
             ApproverPairingInitScreen(
@@ -77,6 +105,36 @@ fun NavGraph() {
                 }
             )
         }
+        composable("approver_new_task") {
+            com.kilu.pocketagent.features.approver.NewTaskScreen(
+                apiClient = apiClient,
+                onCreated = { taskId ->
+                    navController.navigate("approver_plan/\$taskId") {
+                        popUpTo("pairing_home")
+                    }
+                },
+                onCancel = { navController.navigateUp() }
+            )
+        }
+        composable("approver_plan/{taskId}") { backStackEntry ->
+            val tId = backStackEntry.arguments?.getString("taskId") ?: ""
+            com.kilu.pocketagent.features.approver.PlanPreviewScreen(
+                taskId = tId,
+                apiClient = apiClient,
+                onApproved = {
+                    navController.navigate("pairing_home") {
+                        popUpTo("pairing_home") { inclusive = true }
+                    }
+                },
+                onBack = { navController.navigateUp() }
+            )
+        }
+        composable("approver_inbox") {
+            com.kilu.pocketagent.features.approver.ApproverInboxScreen(
+                apiClient = apiClient,
+                onBack = { navController.navigateUp() }
+            )
+        }
         composable("hub_scan") {
             HubScanScreen(
                 onScanSuccess = { payload ->
@@ -86,7 +144,8 @@ fun NavGraph() {
             )
         }
         composable("hub_offer_details") {
-            scannedPayload?.let { payload ->
+            val payload = scannedPayload
+            if (payload != null) {
                 HubOfferDetailsScreen(
                     payload = payload,
                     apiClient = apiClient,
@@ -97,7 +156,9 @@ fun NavGraph() {
                         }
                     }
                 )
-            } ?: Text("Error: No Payload")
+            } else {
+                Text("Error: No Payload")
+            }
         }
         composable("diagnostics") {
             DiagnosticsScreen(

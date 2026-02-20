@@ -7,6 +7,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.kilu.pocketagent.BuildConfig
 import com.kilu.pocketagent.core.crypto.CryptoUtils
 import com.kilu.pocketagent.core.crypto.HashingUtil
 import com.kilu.pocketagent.core.crypto.KeyManager
@@ -33,7 +34,7 @@ fun HubOfferDetailsScreen(
     onPaired: () -> Unit
 ) {
     val context = LocalContext.current
-    val isSigValid = CryptoUtils.verifyServerSig(payload.h, null)
+    val isSigValid = CryptoUtils.verifyServerSig(payload.h, payload.ss, payload.kid)
     var isConfirming by remember { mutableStateOf(false) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
     
@@ -103,7 +104,7 @@ fun HubOfferDetailsScreen(
                             store.setSessionToken(data.hub_session_token)
                             onPaired()
                         } else {
-                            errorMsg = "Confirm failed: ${resp.code} ${resp.body?.string()}"
+                            errorMsg = com.kilu.pocketagent.shared.utils.ErrorHandler.parseError(resp)
                         }
                     } catch (e: Exception) {
                         errorMsg = "Confirm caught: ${e.message}"

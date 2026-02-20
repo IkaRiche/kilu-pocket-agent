@@ -32,11 +32,15 @@ android {
         create("dev") {
             dimension = "environment"
             buildConfigField("String", "DEFAULT_CONTROL_PLANE_URL", "\"http://10.0.2.2:8788\"")
+            buildConfigField("String", "SERVER_KID", "\"dev_key_1\"")
+            buildConfigField("String", "SERVER_PUBKEY_B64", "\"dev_public_key_base64_placeholder_abdsafkjasdflkj\"")
             applicationIdSuffix = ".dev"
         }
         create("prod") {
             dimension = "environment"
             buildConfigField("String", "DEFAULT_CONTROL_PLANE_URL", "\"https://api.kilu.network\"")
+            buildConfigField("String", "SERVER_KID", "\"prod_key_1\"")
+            buildConfigField("String", "SERVER_PUBKEY_B64", "\"prod_public_key_base64_placeholder_abdsafkjasdflkj\"")
         }
     }
 
@@ -74,6 +78,7 @@ dependencies {
     
     // Core Logic
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("androidx.biometric:biometric:1.2.0-alpha05")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     
