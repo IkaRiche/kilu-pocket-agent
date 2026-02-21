@@ -6,9 +6,12 @@ import kotlinx.serialization.json.JsonObject
 @Serializable
 data class ApproverTaskItem(
     val task_id: String,
-    val external_url: String,
+    val title: String? = null,
+    val user_prompt: String? = null,
     val status: String,
-    val created_at: String
+    val created_at: String,
+    val final_report_status: String? = "PENDING",
+    val final_report: String? = null
 )
 
 @Serializable
@@ -25,12 +28,35 @@ data class CreateTaskResp(
 )
 
 @Serializable
+data class PlanStep(
+    val op: String,
+    val desc: String
+)
+
+@Serializable
 data class PlanPreviewResp(
     val plan_id: String,
     val max_steps: Int,
     val expires_at: String,
     val allowlist_domains: List<String>,
-    val forbidden_flags: JsonObject
+    val forbidden_flags: JsonObject,
+    val summary: String? = null,
+    val steps_preview: List<PlanStep>? = null
+)
+
+@Serializable
+data class QuotasResp(
+    val tier: String,
+    val planner_credits: Int,
+    val report_credits: Int,
+    val calls_today: Int,
+    val daily_limit: Int
+)
+
+@Serializable
+data class TaskReportResp(
+    val status: String,
+    val summary: String? = null
 )
 
 @Serializable
