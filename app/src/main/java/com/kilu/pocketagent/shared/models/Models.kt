@@ -14,11 +14,47 @@ data class QRPayload(
 
 @Serializable
 data class PairingInitResponse(
-    val pairing_token: String,
+    val pairing_token: String? = null,
+    val hub_link_code: String? = null,
+    val offer_core_hash: String? = null,
+    val expires_at: String? = null,
+    val qr_payload: ServerQRPayload? = null,
+    val server_sig: String? = null, // Compatibility
+    val short_code: String? = null
+) {
+    fun getEffectiveHash(): String = offer_core_hash 
+        ?: qr_payload?.offer_core_hash 
+        ?: ""
+
+    fun getEffectiveExpiresAt(): String = expires_at 
+        ?: qr_payload?.offer_core?.expires_at 
+        ?: ""
+    
+    fun getEffectiveToken(): String = pairing_token 
+        ?: hub_link_code 
+        ?: qr_payload?.offer_core?.pairing_token 
+        ?: qr_payload?.offer_core?.hub_link_code
+        ?: ""
+}
+
+@Serializable
+data class ServerQRPayload(
+    val offer_core: ServerOfferCore,
     val offer_core_hash: String,
-    val short_code: String? = null,
-    val server_sig: String? = null,
+    val server_sig: ServerSig? = null
+)
+
+@Serializable
+data class ServerOfferCore(
+    val pairing_token: String? = null,
+    val hub_link_code: String? = null,
     val expires_at: String
+)
+
+@Serializable
+data class ServerSig(
+    val alg: String,
+    val sig_b64: String
 )
 
 @Serializable

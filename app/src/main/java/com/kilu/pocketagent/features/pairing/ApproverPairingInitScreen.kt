@@ -50,7 +50,7 @@ fun ApproverPairingInitScreen(apiClient: ApiClient, store: DeviceProfileStore, o
             Image(bitmap = qrBitmap!!.asImageBitmap(), contentDescription = "QR Code", modifier = Modifier.size(250.dp))
             Spacer(modifier = Modifier.height(16.dp))
             Text("Short Code: ${initResp?.short_code ?: "N/A"}")
-            val hash = initResp?.offer_core_hash ?: ""
+            val hash = initResp?.getEffectiveHash() ?: ""
             Text("Hash: ${hash.take(6)}...${hash.takeLast(6)}")
             Spacer(modifier = Modifier.height(24.dp))
             
@@ -59,13 +59,13 @@ fun ApproverPairingInitScreen(apiClient: ApiClient, store: DeviceProfileStore, o
                     isConfirming = true
                     scope.launch {
                         try {
-                            val hashBytes = HashingUtil.extractHashBytesToSign(initResp!!.offer_core_hash)
+                            val hashBytes = HashingUtil.extractHashBytesToSign(initResp!!.getEffectiveHash())
                             keyManager.ensureKey(Role.APPROVER)
                             val signatureB64 = keyManager.sign(Role.APPROVER, hashBytes)
                             val pubkeyB64 = keyManager.publicKey(Role.APPROVER)
                             
                             val reqPayload = ApproverConfirmReq(
-                                pairing_token = initResp!!.pairing_token,
+                                pairing_token = initResp!!.getEffectiveToken(),
                                 display_name = "Approver Device ${Build.MODEL}",
                                 pubkey_b64 = pubkeyB64,
                                 signature_b64 = signatureB64
@@ -122,10 +122,10 @@ fun ApproverPairingInitScreen(apiClient: ApiClient, store: DeviceProfileStore, o
                     
                     val payload = QRPayload(
                         cp = apiClient.baseOrigin(),
-                        t = data.pairing_token,
-                        h = data.offer_core_hash,
-                        e = data.expires_at,
-                        ss = data.server_sig,
+                        t = data.getEffectiveToken(),
+                        h = data.getEffectiveHash(),
+                        e = data.getEffectiveExpiresAt(),
+                        ss = data.server_sig ?: data.qr_payload?.server_sig?.sig_b64,
                         kid = BuildConfig.SERVER_KID
                     )
                     val jsonStr = jsonParser.encodeToString(payload)
