@@ -42,7 +42,7 @@ fun PlanPreviewScreen(
     LaunchedEffect(taskId) {
         try {
             val req = Request.Builder()
-                .url("${apiClient.getBaseUrl()}/v1/tasks/$taskId/plan")
+                .url(apiClient.apiUrl("tasks/$taskId/plan"))
                 .post("{\"planner_mode\": \"managed\"}".toRequestBody("application/json".toMediaType()))
                 .build()
             val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }
@@ -146,7 +146,7 @@ fun PlanPreviewScreen(
                                 )
                                 
                                 val appReq = Request.Builder()
-                                    .url("\${apiClient.getBaseUrl()}/v1/plans/\${planData!!.plan_id}/approve")
+                                    .url(apiClient.apiUrl("plans/${planData!!.plan_id}/approve"))
                                     .post(jsonParser.encodeToString(approvePayload).toByteArray().toRequestBody("application/json".toMediaType()))
                                     .build()
                                 

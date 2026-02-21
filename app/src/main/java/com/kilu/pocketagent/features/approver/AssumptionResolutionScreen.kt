@@ -105,7 +105,7 @@ fun AssumptionResolutionScreen(
                                 )
                             )
                             val req = Request.Builder()
-                                .url("\${apiClient.getBaseUrl()}/v1/tasks/\$taskId/assumptions/resolve")
+                                .url(apiClient.apiUrl("tasks/$taskId/assumptions/resolve"))
                                 .post(jsonParser.encodeToString(payload).toByteArray().toRequestBody("application/json".toMediaType()))
                                 .build()
                             val resp = apiClient.client.newCall(req).execute()

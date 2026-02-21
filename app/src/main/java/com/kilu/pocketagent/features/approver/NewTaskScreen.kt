@@ -85,7 +85,7 @@ fun NewTaskScreen(apiClient: ApiClient, onCreated: (String) -> Unit, onCancel: (
                         try {
                             val reqPayload = CreateTaskReq(url = urlInput.trim())
                             val req = Request.Builder()
-                                .url("\${apiClient.getBaseUrl()}/v1/tasks")
+                                .url(apiClient.apiUrl("tasks"))
                                 .post(jsonParser.encodeToString(reqPayload).toByteArray().toRequestBody("application/json".toMediaType()))
                                 .build()
                             

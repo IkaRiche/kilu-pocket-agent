@@ -176,6 +176,7 @@ fun NavGraph() {
         }
         composable("diagnostics") {
             DiagnosticsScreen(
+                apiClient = apiClient,
                 store = store,
                 onBack = { navController.navigateUp() }
             )
