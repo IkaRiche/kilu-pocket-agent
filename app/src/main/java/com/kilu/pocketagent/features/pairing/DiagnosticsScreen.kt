@@ -7,12 +7,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.kilu.pocketagent.core.crypto.KeyManager
+import com.kilu.pocketagent.core.network.ApiClient
 import com.kilu.pocketagent.core.storage.DeviceProfileStore
 import java.security.MessageDigest
 
 @Composable
-fun DiagnosticsScreen(store: DeviceProfileStore, onBack: () -> Unit) {
+fun DiagnosticsScreen(apiClient: ApiClient, store: DeviceProfileStore, onBack: () -> Unit) {
     val context = LocalContext.current
     val keyManager = remember { KeyManager(context) }
     
@@ -37,7 +37,9 @@ fun DiagnosticsScreen(store: DeviceProfileStore, onBack: () -> Unit) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("Role: ${role?.name ?: "None"}", style = MaterialTheme.typography.bodyLarge)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("Control Plane: ${store.getControlPlaneUrl()}", style = MaterialTheme.typography.bodyMedium)
+                Text("Control Plane Origin: ${apiClient.baseOrigin()}", style = MaterialTheme.typography.bodyMedium)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("API Base: ${apiClient.apiUrl("")}", style = MaterialTheme.typography.bodyMedium)
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 val tId = store.getTenantId()

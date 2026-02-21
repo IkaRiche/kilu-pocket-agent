@@ -39,7 +39,7 @@ fun HubDashboardScreen(apiClient: ApiClient, onSessionInvalid: () -> Unit) {
             errorMsg = null
             try {
                 val req = Request.Builder()
-                    .url("\${apiClient.getBaseUrl()}/v1/hub/queue?max=5")
+                    .url(apiClient.apiUrl("hub/queue?max=5"))
                     .get()
                     .build()
                 val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }

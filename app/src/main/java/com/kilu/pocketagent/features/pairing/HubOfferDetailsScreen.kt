@@ -89,10 +89,10 @@ fun HubOfferDetailsScreen(
                             pubkey_b64 = pubkeyB64,
                             signature_b64 = signatureB64
                         )
-                        val bodyBytes = jsonParser.encodeToString(reqPayload).toByteArray()
+                        val jsonStr = jsonParser.encodeToString(reqPayload)
                         val request = Request.Builder()
-                            .url("${apiClient.getBaseUrl()}/v1/hubs/confirm")
-                            .post(bodyBytes.toRequestBody("application/json".toMediaType()))
+                            .url(apiClient.apiUrl("hubs/confirm"))
+                            .post(jsonStr.toByteArray().toRequestBody("application/json".toMediaType()))
                             .build()
                         
                         val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(request).execute() }

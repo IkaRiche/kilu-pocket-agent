@@ -72,7 +72,7 @@ fun ApproverPairingInitScreen(apiClient: ApiClient, store: DeviceProfileStore, o
                             )
                             val bodyBytes = jsonParser.encodeToString(reqPayload).toByteArray()
                             val request = Request.Builder()
-                                .url("${apiClient.getBaseUrl()}/v1/devices/approver/confirm")
+                                .url(apiClient.apiUrl("devices/approver/confirm"))
                                 .post(bodyBytes.toRequestBody("application/json".toMediaType()))
                                 .build()
                             
@@ -111,7 +111,7 @@ fun ApproverPairingInitScreen(apiClient: ApiClient, store: DeviceProfileStore, o
         scope.launch {
             try {
                 val req = Request.Builder()
-                    .url("${apiClient.getBaseUrl()}/v1/devices/approver/init")
+                    .url(apiClient.apiUrl("devices/approver/init"))
                     .post("{}".toRequestBody("application/json".toMediaType()))
                     .build()
                 val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }
@@ -121,7 +121,7 @@ fun ApproverPairingInitScreen(apiClient: ApiClient, store: DeviceProfileStore, o
                     initResp = data
                     
                     val payload = QRPayload(
-                        cp = apiClient.getBaseUrl(),
+                        cp = apiClient.baseOrigin(),
                         t = data.pairing_token,
                         h = data.offer_core_hash,
                         e = data.expires_at,

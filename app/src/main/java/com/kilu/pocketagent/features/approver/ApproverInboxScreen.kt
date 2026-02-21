@@ -35,7 +35,7 @@ fun ApproverInboxScreen(apiClient: ApiClient, onResolveRequested: (String) -> Un
             errorMsg = null
             try {
                 val req = Request.Builder()
-                    .url("\${apiClient.getBaseUrl()}/v1/inbox?max=50")
+                    .url(apiClient.apiUrl("inbox?max=50"))
                     .get()
                     .build()
                 val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }
@@ -152,7 +152,7 @@ fun InboxCard(ep: InboxEpisode, apiClient: ApiClient, jsonParser: Json, onAcked:
                         scope.launch {
                             try {
                                 val req = Request.Builder()
-                                    .url("\${apiClient.getBaseUrl()}/v1/inbox/ack")
+                                    .url(apiClient.apiUrl("inbox/ack"))
                                     .post("{\"episode_id\":\"\${ep.episode_id}\"}".toRequestBody("application/json".toMediaType()))
                                     .build()
                                 val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }

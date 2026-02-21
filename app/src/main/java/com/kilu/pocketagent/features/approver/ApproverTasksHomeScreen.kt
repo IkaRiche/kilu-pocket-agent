@@ -39,7 +39,7 @@ fun ApproverTasksHomeScreen(
     val loadQuotas = {
         scope.launch {
             try {
-                val req = Request.Builder().url("${apiClient.getBaseUrl()}/v1/quotas").get().build()
+                val req = Request.Builder().url(apiClient.apiUrl("quotas")).get().build()
                 val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }
                 if (resp.isSuccessful) {
                     quotas = jsonParser.decodeFromString<QuotasResp>(resp.body?.string() ?: "")
@@ -55,7 +55,7 @@ fun ApproverTasksHomeScreen(
             loadQuotas()
             try {
                 val req = Request.Builder()
-                    .url("${apiClient.getBaseUrl()}/v1/tasks?limit=10")
+                    .url(apiClient.apiUrl("tasks?limit=10"))
                     .get()
                     .build()
                 val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }
@@ -152,7 +152,7 @@ fun ApproverTasksHomeScreen(
                                             scope.launch {
                                                 try {
                                                     val req = Request.Builder()
-                                                        .url("${apiClient.getBaseUrl()}/v1/tasks/${task.task_id}/report/generate")
+                                                        .url(apiClient.apiUrl("tasks/${task.task_id}/report/generate"))
                                                         .post("{}".toByteArray().toRequestBody("application/json".toMediaType()))
                                                         .build()
                                                     apiClient.client.newCall(req).execute()

@@ -112,7 +112,7 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
                     delay(30_000)
                     try {
                         val req = Request.Builder()
-                            .url("${apiClient.getBaseUrl()}/v1/hub/lease/refresh")
+                            .url(apiClient.apiUrl("hub/lease/refresh"))
                             .post("{\"task_id\":\"${task.task_id}\"}".toRequestBody("application/json".toMediaType()))
                             .build()
                         apiClient.client.newCall(req).execute()
@@ -122,7 +122,7 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
 
             // Mint batch checks
             val mintReq = Request.Builder()
-                .url("${apiClient.getBaseUrl()}/v1/grants/${task.grant_id}/mint-step-batch")
+                .url(apiClient.apiUrl("grants/${task.grant_id}/mint-step-batch"))
                 .post(jsonParser.encodeToString(MintStepBatchReq(1)).toByteArray().toRequestBody("application/json".toMediaType()))
                 .build()
                                 
@@ -188,7 +188,7 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
             )
             
             val pubReq = Request.Builder()
-                .url("${apiClient.getBaseUrl()}/v1/tasks/${task.task_id}/result")
+                .url(apiClient.apiUrl("tasks/${task.task_id}/result"))
                 .post(jsonParser.encodeToString(resPayload).toByteArray().toRequestBody("application/json".toMediaType()))
                 .build()
                 
@@ -218,7 +218,7 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
                     assumptions = listOf(AssumptionItemReq(key, "Execution blocked: $reason"))
                 )
                 val req = Request.Builder()
-                    .url("${apiClient.getBaseUrl()}/v1/tasks/$taskId/assumptions/request")
+                    .url(apiClient.apiUrl("tasks/$taskId/assumptions/request"))
                     .post(jsonParser.encodeToString(payload).toByteArray().toRequestBody("application/json".toMediaType()))
                     .build()
                 withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }
@@ -234,7 +234,7 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
         return withContext(Dispatchers.IO) {
             try {
                 val req = Request.Builder()
-                    .url("${apiClient.getBaseUrl()}/v1/hub/queue?max=1")
+                    .url(apiClient.apiUrl("hub/queue?max=1"))
                     .get()
                     .build()
                 val resp = apiClient.client.newCall(req).execute()

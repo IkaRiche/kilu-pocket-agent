@@ -21,16 +21,15 @@ class ApiClient(val store: DeviceProfileStore) {
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    fun getBaseUrl(): String {
-        val raw = store.getControlPlaneUrl()
-        var normalized = raw.trimEnd('/')
-        if (!normalized.endsWith("/v1")) {
-            normalized += "/v1"
-        }
-        
-        if (BuildConfig.FLAVOR == "prod" && !normalized.startsWith("https://")) {
-            throw IllegalStateException("Prod flavor requires https:// scheme!")
-        }
-        return normalized
+    fun baseOrigin(): String {
+        val raw = store.getControlPlaneUrl().trim().trimEnd('/')
+        return if (raw.endsWith("/v1")) raw.removeSuffix("/v1") else raw
     }
+
+    fun apiUrl(path: String): String {
+        val p = path.trim().removePrefix("/")
+        return "${baseOrigin()}/v1/$p"
+    }
+
+    fun getBaseUrl(): String = baseOrigin() // Compatibility or remove later
 }

@@ -55,7 +55,7 @@ fun PairingHomeScreen(
                         inboxStatus = "Checking..."
                         try {
                             val request = Request.Builder()
-                                .url("${apiClient.getBaseUrl()}/v1/inbox?max=1")
+                                .url(apiClient.apiUrl("inbox?max=1"))
                                 .get()
                                 .build()
                             val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(request).execute() }
