@@ -42,8 +42,8 @@ fun PlanPreviewScreen(
     LaunchedEffect(taskId) {
         try {
             val req = Request.Builder()
-                .url("\${apiClient.getBaseUrl()}/v1/tasks/\$taskId/plan")
-                .post("{}".toRequestBody("application/json".toMediaType()))
+                .url("${apiClient.getBaseUrl()}/v1/tasks/$taskId/plan")
+                .post("{\"planner_mode\": \"managed\"}".toRequestBody("application/json".toMediaType()))
                 .build()
             val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }
             if (resp.isSuccessful) {
@@ -53,7 +53,7 @@ fun PlanPreviewScreen(
                 errorMsg = ErrorHandler.parseError(resp)
             }
         } catch (e: Exception) {
-            errorMsg = "Failed to fetch plan: \${e.message}"
+            errorMsg = "Failed to fetch plan: ${e.message}"
         }
     }
 
@@ -64,13 +64,26 @@ fun PlanPreviewScreen(
         if (planData != null) {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Plan ID: \${planData!!.plan_id.take(8)}...")
+                    Text("Plan ID: ${planData!!.plan_id.take(8)}...")
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("Allowed Domains: \${planData!!.allowlist_domains.joinToString()}")
-                    Text("Max Steps: \${planData!!.max_steps}")
-                    Text("Expires At: \${planData!!.expires_at}")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Forbidden Flags: \${planData!!.forbidden_flags}")
+                    
+                    planData!!.summary?.let {
+                        Text("AI Summary:", style = MaterialTheme.typography.labelLarge)
+                        Text(it, style = MaterialTheme.typography.bodyMedium)
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    Text("Allowed Domains: ${planData!!.allowlist_domains.joinToString()}")
+                    Text("Max Steps: ${planData!!.max_steps}")
+                    Text("Expires At: ${planData!!.expires_at}")
+                    
+                    planData!!.steps_preview?.let { steps ->
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("Steps Preview:", style = MaterialTheme.typography.labelLarge)
+                        steps.forEach { step ->
+                            Text("• ${step.op}: ${step.desc}", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
                 }
             }
             
@@ -78,11 +91,11 @@ fun PlanPreviewScreen(
             Text("One approval enables autonomous execution within limits (domain, steps, time).", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
             
         } else if (errorMsg != null) {
-            Text("Error: \$errorMsg", color = MaterialTheme.colorScheme.error)
+            Text("Error: $errorMsg", color = MaterialTheme.colorScheme.error)
         } else {
             CircularProgressIndicator()
             Spacer(modifier = Modifier.height(8.dp))
-            Text("Analyzing bounds...")
+            Text("AI is analyzing bonds...")
         }
 
         Spacer(modifier = Modifier.weight(1f))
