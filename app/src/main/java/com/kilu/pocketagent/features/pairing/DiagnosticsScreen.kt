@@ -7,6 +7,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.kilu.pocketagent.core.crypto.KeyManager
 import com.kilu.pocketagent.core.network.ApiClient
 import com.kilu.pocketagent.core.storage.DeviceProfileStore
 import java.security.MessageDigest
@@ -21,7 +22,7 @@ fun DiagnosticsScreen(apiClient: ApiClient, store: DeviceProfileStore, onBack: (
         if (role != null) {
             keyManager.ensureKey(role)
             val pubB64 = keyManager.publicKey(role)
-            val bytes = android.util.Base64.decode(pubB64, android.util.Base64.NO_WRAP)
+            val bytes = android.util.Base64.decode(pubB64 as String, android.util.Base64.NO_WRAP)
             val digest = MessageDigest.getInstance("SHA-256").digest(bytes)
             digest.take(8).joinToString("") { "%02x".format(it) }
         } else {
