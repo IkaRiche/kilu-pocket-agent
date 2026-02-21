@@ -5,21 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.3.6] - 2026-02-20
+## [0.3.9] - 2026-02-21
 
 ### Added
-- Week 4 Release Packaging Workflow (.github/workflows/release.yml)
-- Enforced HTTPS on Prod flavor via build config constraints and UI validation.
-- `DEFAULT_CONTROL_PLANE_URL` hardened to the Cloudflare Worker.
-- Release APK `app-prod-release.apk` generation pipeline yielding SHA256 sums securely.
+- Gemini Planner v0: Intelligent plan generation with managed key support.
+- Plan Previews: AI-generated summaries and detailed step previews in the UI.
+- Quota Management: Real-time display of planner and report credits/daily limits.
+- On-demand Reporting: Approver-triggered AI summarization for completed tasks.
+
+## [0.3.8] - 2026-02-21
+
+### Fixed
+- Diagnostics: Securely generate KeyPair for device initialization.
+- Network: Enforce JSON `Content-Type` for POST initialization requests.
+
+## [0.3.7] - 2026-02-20
 
 ### Changed
-- Refactored `build.gradle.kts` introducing separate `prod` and `dev` environmental dimensions cleanly.
-- Enforced `isDebuggable = false` correctly targeting the `prodRelease` build variant.
-- Set `applicationIdSuffix = ".dev"` strictly isolating local/sandbox builds from canonical prod footprint cleanly.
-
-## [0.3.5] - 2026-02-19
-
-### Added
-- Hub Always-On background runtime via explicitly scoped `LifecycleService`.
-- Active execution limits preventing quota runaway loops inherently (i.e. strictly bound thermal wake-locks yielding 20 operations hourly).
+- Incremented `versionCode` to 37 for canonical release tracking.
+- Implemented persistent JKS keystore for release signatures.
