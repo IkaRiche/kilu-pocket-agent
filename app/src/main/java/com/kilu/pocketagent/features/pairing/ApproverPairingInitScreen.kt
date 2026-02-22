@@ -46,6 +46,12 @@ fun ApproverPairingInitScreen(apiClient: ApiClient, store: DeviceProfileStore, o
         Text("Pair a Hub", style = MaterialTheme.typography.headlineMedium)
         Spacer(modifier = Modifier.height(16.dp))
         
+        // Always show errors if present
+        if (errorMsg != null) {
+            Text("Error: $errorMsg", color = MaterialTheme.colorScheme.error)
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+        
         if (qrBitmap != null && initResp != null) {
             Image(bitmap = qrBitmap!!.asImageBitmap(), contentDescription = "QR Code", modifier = Modifier.size(250.dp))
             Spacer(modifier = Modifier.height(16.dp))
@@ -57,6 +63,7 @@ fun ApproverPairingInitScreen(apiClient: ApiClient, store: DeviceProfileStore, o
             Button(
                 onClick = {
                     isConfirming = true
+                    errorMsg = null
                     scope.launch {
                         try {
                             val hashBytes = HashingUtil.extractHashBytesToSign(initResp!!.getEffectiveHash())
@@ -77,15 +84,15 @@ fun ApproverPairingInitScreen(apiClient: ApiClient, store: DeviceProfileStore, o
                                 .build()
                             
                             val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(request).execute() }
+                            val bodyStr = resp.body?.string() ?: ""
                             if (resp.isSuccessful) {
-                                val bodyStr = resp.body?.string() ?: ""
                                 val data = jsonParser.decodeFromString<ApproverConfirmResp>(bodyStr)
                                 store.setDeviceId(data.device_id)
                                 store.setTenantId(data.tenant_id)
                                 store.setSessionToken(data.device_session_token)
                                 onPaired()
                             } else {
-                                errorMsg = com.kilu.pocketagent.shared.utils.ErrorHandler.parseError(resp)
+                                errorMsg = "Confirm failed (${resp.code}): $bodyStr"
                             }
                         } catch (e: Exception) {
                             errorMsg = "Confirm caught: ${e.message}"
@@ -98,9 +105,7 @@ fun ApproverPairingInitScreen(apiClient: ApiClient, store: DeviceProfileStore, o
             ) {
                 Text(if (isConfirming) "Confirming..." else "Confirm this Approver")
             }
-        } else if (errorMsg != null) {
-            Text("Error: $errorMsg", color = MaterialTheme.colorScheme.error)
-        } else {
+        } else if (errorMsg == null) {
             CircularProgressIndicator()
             Spacer(modifier = Modifier.height(8.dp))
             Text("Fetching pairing offer from Control Plane...")
