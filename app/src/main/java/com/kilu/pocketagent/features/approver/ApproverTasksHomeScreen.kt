@@ -26,7 +26,8 @@ fun ApproverTasksHomeScreen(
     onSessionInvalid: () -> Unit,
     onNewTaskClick: () -> Unit,
     onTaskClick: (String, String) -> Unit, // pass task_id and status
-    onInboxClick: () -> Unit
+    onInboxClick: () -> Unit,
+    onPairHub: () -> Unit
 ) {
     var tasks by remember { mutableStateOf<List<ApproverTaskItem>>(emptyList()) }
     var quotas by remember { mutableStateOf<QuotasResp?>(null) }
@@ -111,12 +112,15 @@ fun ApproverTasksHomeScreen(
             OutlinedButton(onClick = onInboxClick) {
                 Text("Inbox")
             }
+            OutlinedButton(onClick = onPairHub) {
+                Text("Pair Hub")
+            }
         }
         
         Spacer(modifier = Modifier.height(16.dp))
         
         if (errorMsg != null) {
-            Text("Error: \$errorMsg", color = MaterialTheme.colorScheme.error)
+            Text("Error: $errorMsg", color = MaterialTheme.colorScheme.error)
         }
         
         if (isLoading) {

@@ -12,8 +12,8 @@ android {
         applicationId = "com.kilu.pocketagent"
         minSdk = 26
         targetSdk = 34
-        versionCode = 45
-        versionName = "0.4.5"
+        versionCode = 50
+        versionName = "0.5.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
