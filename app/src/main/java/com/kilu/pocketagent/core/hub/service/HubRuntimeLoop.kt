@@ -141,7 +141,7 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
             executor = WebViewExecutor(context)
             executor.initialize()
             
-            val loadRes = executor.loadUrl(task.external_url, 15000, 5000)
+            val loadRes = executor.loadUrl(task.external_url ?: "", 15000, 5000)
             if (loadRes.isFailure) {
                 handleEscalation(task.task_id, "page_load_failed", "Load failed natively")
                 return@coroutineScope
@@ -179,7 +179,7 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
             val facts = parsedHeadings.take(5).map { "Heading Extracted: $it" }
 
             val resPayload = SubmitResultReq(
-                url = task.external_url,
+                url = task.external_url ?: "",
                 extracted_text = safeText,
                 summary = autoSummary,
                 headings = parsedHeadings,

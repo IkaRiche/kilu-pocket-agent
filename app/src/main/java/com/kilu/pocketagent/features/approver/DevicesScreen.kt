@@ -3,8 +3,8 @@ package com.kilu.pocketagent.features.approver
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material.icons.outlined.QrCode2
+import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -126,7 +126,7 @@ fun DevicesScreen(
                 enabled = isPaired,
                 shape = RoundedCornerShape(8.dp)
             ) {
-                Icon(Icons.Outlined.QrCode2, contentDescription = null)
+                Icon(Icons.Filled.Add, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Pair a Hub Device")
             }
@@ -174,7 +174,7 @@ private fun DetailRow(
         )
         IconButton(onClick = onCopy, modifier = Modifier.size(24.dp)) {
             Icon(
-                Icons.Outlined.ContentCopy,
+                Icons.Filled.Create,
                 contentDescription = "Copy $label",
                 modifier = Modifier.size(16.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant

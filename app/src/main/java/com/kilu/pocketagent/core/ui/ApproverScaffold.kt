@@ -2,8 +2,8 @@ package com.kilu.pocketagent.core.ui
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.outlined.Devices
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -16,8 +16,8 @@ import com.kilu.pocketagent.features.approver.DevicesScreen
 import com.kilu.pocketagent.features.approver.SettingsScreen
 
 enum class ApproverTab(val label: String, val icon: ImageVector) {
-    TASKS("Tasks", Icons.Filled.Shield),
-    DEVICES("Devices", Icons.Outlined.Devices),
+    TASKS("Tasks", Icons.Filled.Home),
+    DEVICES("Devices", Icons.Filled.PhoneAndroid),
     SETTINGS("Settings", Icons.Outlined.Settings)
 }
 
