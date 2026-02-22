@@ -43,7 +43,7 @@ fun ApproverPairingInitScreen(apiClient: ApiClient, store: DeviceProfileStore, o
     val keyManager = remember { KeyManager(context) }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("Pair a Hub", style = MaterialTheme.typography.headlineMedium)
+        Text("Register as Approver", style = MaterialTheme.typography.headlineMedium)
         Spacer(modifier = Modifier.height(16.dp))
         
         // Always show errors if present
