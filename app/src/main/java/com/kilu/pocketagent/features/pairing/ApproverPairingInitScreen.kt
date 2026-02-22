@@ -39,7 +39,7 @@ fun ApproverPairingInitScreen(apiClient: ApiClient, store: DeviceProfileStore, o
     var isConfirming by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     
-    val jsonParser = Json { ignoreUnknownKeys = true }
+    val jsonParser = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     val keyManager = remember { KeyManager(context) }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
