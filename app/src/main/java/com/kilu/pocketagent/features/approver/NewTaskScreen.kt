@@ -63,7 +63,7 @@ fun NewTaskScreen(apiClient: ApiClient, onCreated: (String) -> Unit, onCancel: (
         
         Spacer(modifier = Modifier.height(16.dp))
         if (errorMsg != null) {
-            Text("Error: \$errorMsg", color = MaterialTheme.colorScheme.error)
+            Text("Error: $errorMsg", color = MaterialTheme.colorScheme.error)
             Spacer(modifier = Modifier.height(8.dp))
         }
         

@@ -4,13 +4,20 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
 @Serializable
+data class HubQueueListResponse(
+    val items: List<HubQueueResponse> = emptyList()
+)
+
+@Serializable
 data class HubQueueResponse(
     val task_id: String,
-    val plan_id: String,
-    val grant_id: String,
-    val tenant_id: String,
-    val external_url: String,
-    val expires_at: String,
+    val plan_id: String? = null,
+    val active_grant_id: String? = null,
+    val grant_id: String? = null,
+    val tenant_id: String? = null,
+    val inputs: String? = null,
+    val external_url: String? = null,
+    val expires_at: String? = null,
     val limits: JsonObject? = null,
     val forbidden: JsonObject? = null
 )
