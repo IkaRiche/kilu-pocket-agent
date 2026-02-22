@@ -39,7 +39,7 @@ fun HubOfferDetailsScreen(
     var errorMsg by remember { mutableStateOf<String?>(null) }
     
     val scope = rememberCoroutineScope()
-    val jsonParser = Json { ignoreUnknownKeys = true }
+    val jsonParser = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     val keyManager = remember { KeyManager(context) }
     
     // Validations
