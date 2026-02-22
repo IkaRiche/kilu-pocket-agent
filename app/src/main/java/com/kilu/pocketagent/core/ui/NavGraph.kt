@@ -77,8 +77,9 @@ fun NavGraph() {
 
         // ── Approver: Paired Home (Tasks) ──
         composable("approver_home") {
-            com.kilu.pocketagent.features.approver.ApproverTasksHomeScreen(
+            ApproverScaffold(
                 apiClient = apiClient,
+                store = store,
                 onSessionInvalid = {
                     store.clearPairing()
                     navController.navigate("approver_register") {
@@ -88,11 +89,24 @@ fun NavGraph() {
                 onNewTaskClick = { navController.navigate("approver_new_task") },
                 onTaskClick = { taskId, status -> 
                     if (status == "NEEDS_PLAN_APPROVAL") {
-                        navController.navigate("approver_plan/\$taskId")
+                        navController.navigate("approver_plan/$taskId")
                     }
                 },
                 onInboxClick = { navController.navigate("approver_inbox") },
-                onPairHub = { navController.navigate("hub_pair_init") }
+                onPairHub = { navController.navigate("hub_pair_init") },
+                onDiagnostics = { navController.navigate("diagnostics") },
+                onResetPairing = {
+                    store.clearPairing()
+                    navController.navigate("welcome") {
+                        popUpTo("approver_home") { inclusive = true }
+                    }
+                },
+                onSwitchRole = {
+                    store.clearPairing()
+                    navController.navigate("role_select") {
+                        popUpTo("approver_home") { inclusive = true }
+                    }
+                }
             )
         }
 
