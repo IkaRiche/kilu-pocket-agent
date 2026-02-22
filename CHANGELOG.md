@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.3] - 2026-02-22
+
+### Fixed
+- Cryptographic Handshake: `HashingUtil` now signs UTF-8 bytes of full `sha256:<hex>` string, matching the server's `TextEncoder().encode()` behavior.
+- Server Signature Verification: Replaced placeholder `SERVER_PUBKEY_B64` with real Ed25519 public key derived from worker seed.
+- Device Confirm: Both Approver and Hub confirm flows now produce signatures the server can verify.
+
 ## [0.4.2] - 2026-02-21
 
 ### Fixed

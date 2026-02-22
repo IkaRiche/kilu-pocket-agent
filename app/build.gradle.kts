@@ -12,8 +12,8 @@ android {
         applicationId = "com.kilu.pocketagent"
         minSdk = 26
         targetSdk = 34
-        versionCode = 42
-        versionName = "0.4.2"
+        versionCode = 43
+        versionName = "0.4.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -48,7 +48,7 @@ android {
             dimension = "environment"
             buildConfigField("String", "DEFAULT_CONTROL_PLANE_URL", "\"http://10.0.2.2:8788\"")
             buildConfigField("String", "SERVER_KID", "\"dev_key_1\"")
-            buildConfigField("String", "SERVER_PUBKEY_B64", "\"dev_public_key_base64_placeholder_abdsafkjasdflkj\"")
+            buildConfigField("String", "SERVER_PUBKEY_B64", "\"e8MHlRjtEdoDNghb9pYpIP+H+zxNYwqbWMthU2dPXdY=\"")
             buildConfigField("boolean", "ENFORCE_HTTPS", "false")
             applicationIdSuffix = ".dev"
         }
@@ -56,7 +56,7 @@ android {
             dimension = "environment"
             buildConfigField("String", "DEFAULT_CONTROL_PLANE_URL", "\"https://kilu-control-plane.heizungsrechner.workers.dev\"")
             buildConfigField("String", "SERVER_KID", "\"prod_key_1\"")
-            buildConfigField("String", "SERVER_PUBKEY_B64", "\"prod_public_key_base64_placeholder_abdsafkjasdflkj\"")
+            buildConfigField("String", "SERVER_PUBKEY_B64", "\"e8MHlRjtEdoDNghb9pYpIP+H+zxNYwqbWMthU2dPXdY=\"")
             buildConfigField("boolean", "ENFORCE_HTTPS", "true")
         }
     }
