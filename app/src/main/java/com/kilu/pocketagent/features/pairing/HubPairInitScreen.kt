@@ -13,7 +13,7 @@ import com.kilu.pocketagent.core.network.ApiClient
 import com.kilu.pocketagent.core.storage.DeviceProfileStore
 import com.kilu.pocketagent.shared.models.PairingInitResponse
 import com.kilu.pocketagent.shared.models.QRPayload
-import com.kilu.pocketagent.shared.utils.QrGenerator
+import com.kilu.pocketagent.core.qr.QrGenerator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
