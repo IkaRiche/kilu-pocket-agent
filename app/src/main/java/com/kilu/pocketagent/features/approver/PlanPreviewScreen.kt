@@ -103,7 +103,7 @@ fun PlanPreviewScreen(
         if (errorMsg != null) {
             if (errorMsg != null) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("Status: \$errorMsg", color = MaterialTheme.colorScheme.error)
+                Text("Status: $errorMsg", color = MaterialTheme.colorScheme.error)
             }
         }
 

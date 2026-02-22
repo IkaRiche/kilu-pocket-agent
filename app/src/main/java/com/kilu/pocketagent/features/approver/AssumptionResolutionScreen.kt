@@ -84,7 +84,7 @@ fun AssumptionResolutionScreen(
         Spacer(modifier = Modifier.weight(1f))
         
         if (errorMsg != null) {
-            Text("Error: \$errorMsg", color = MaterialTheme.colorScheme.error)
+            Text("Error: $errorMsg", color = MaterialTheme.colorScheme.error)
             Spacer(modifier = Modifier.height(8.dp))
         }
 

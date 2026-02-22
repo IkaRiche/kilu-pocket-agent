@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import com.kilu.pocketagent.core.hub.service.HubRuntimeService
 import com.kilu.pocketagent.core.network.ApiClient
 import com.kilu.pocketagent.shared.models.HubQueueResponse
+import com.kilu.pocketagent.shared.models.HubQueueListResponse
 import com.kilu.pocketagent.shared.utils.ErrorHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -45,8 +46,9 @@ fun HubDashboardScreen(apiClient: ApiClient, onSessionInvalid: () -> Unit) {
                 val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }
                 
                 if (resp.isSuccessful) {
-                    val bodyStr = resp.body?.string() ?: "[]"
-                    queue = jsonParser.decodeFromString<List<HubQueueResponse>>(bodyStr)
+                    val bodyStr = resp.body?.string() ?: "{}"
+                    val wrapper = jsonParser.decodeFromString<HubQueueListResponse>(bodyStr)
+                    queue = wrapper.items
                 } else if (resp.code == 401 || resp.code == 403) {
                     onSessionInvalid()
                 } else {
@@ -99,7 +101,7 @@ fun HubDashboardScreen(apiClient: ApiClient, onSessionInvalid: () -> Unit) {
         Spacer(modifier = Modifier.height(8.dp))
 
         if (errorMsg != null) {
-            Text("Error: \$errorMsg", color = MaterialTheme.colorScheme.error)
+            Text("Error: $errorMsg", color = MaterialTheme.colorScheme.error)
             Spacer(modifier = Modifier.height(8.dp))
         }
 
@@ -119,11 +121,11 @@ fun HubDashboardScreen(apiClient: ApiClient, onSessionInvalid: () -> Unit) {
 fun HubTaskCard(task: HubQueueResponse) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Task: \${task.task_id.take(8)}", style = MaterialTheme.typography.titleMedium)
+            Text("Task: ${task.task_id.take(8)}", style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(4.dp))
-            Text("URL: \${task.external_url}", style = MaterialTheme.typography.bodyMedium)
+            Text("URL: ${task.external_url ?: "N/A"}", style = MaterialTheme.typography.bodyMedium)
             Spacer(modifier = Modifier.height(4.dp))
-            Text("Lease Expires: \${task.expires_at}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            Text("Expires: ${task.expires_at ?: "N/A"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
     }
 }

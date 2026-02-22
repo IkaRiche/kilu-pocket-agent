@@ -66,7 +66,7 @@ fun ApproverInboxScreen(apiClient: ApiClient, onResolveRequested: (String) -> Un
         Spacer(modifier = Modifier.height(16.dp))
         
         if (errorMsg != null) {
-            Text("Error: \$errorMsg", color = MaterialTheme.colorScheme.error)
+            Text("Error: $errorMsg", color = MaterialTheme.colorScheme.error)
             Spacer(modifier = Modifier.height(8.dp))
         }
 
