@@ -1,31 +1,41 @@
 package com.kilu.pocketagent.features.approver
 
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.kilu.pocketagent.core.network.ApiClient
+import com.kilu.pocketagent.core.ui.components.EmptyState
+import com.kilu.pocketagent.core.ui.components.StatusChip
+import com.kilu.pocketagent.core.ui.components.TaskCard
 import com.kilu.pocketagent.shared.models.ApproverTaskItem
+import com.kilu.pocketagent.shared.models.QuotasResp
 import com.kilu.pocketagent.shared.utils.ErrorHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import com.kilu.pocketagent.shared.models.QuotasResp
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ApproverTasksHomeScreen(
     apiClient: ApiClient,
     onSessionInvalid: () -> Unit,
     onNewTaskClick: () -> Unit,
-    onTaskClick: (String, String) -> Unit, // pass task_id and status
+    onTaskClick: (String, String) -> Unit,
     onInboxClick: () -> Unit,
     onPairHub: () -> Unit
 ) {
@@ -45,7 +55,7 @@ fun ApproverTasksHomeScreen(
                 if (resp.isSuccessful) {
                     quotas = jsonParser.decodeFromString<QuotasResp>(resp.body?.string() ?: "")
                 }
-            } catch (e: Exception) { /* ignore quota fetch errors for now */ }
+            } catch (_: Exception) {}
         }
     }
 
@@ -60,127 +70,200 @@ fun ApproverTasksHomeScreen(
                     .get()
                     .build()
                 val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }
-                
                 if (resp.isSuccessful) {
-                    val bodyStr = resp.body?.string() ?: "[]"
-                    tasks = jsonParser.decodeFromString<List<ApproverTaskItem>>(bodyStr)
+                    val body = resp.body?.string() ?: "[]"
+                    tasks = jsonParser.decodeFromString<List<ApproverTaskItem>>(body)
                 } else if (resp.code == 401 || resp.code == 403) {
                     onSessionInvalid()
                 } else {
                     errorMsg = ErrorHandler.parseError(resp)
                 }
-            } catch(e: Exception) {
+            } catch (e: Exception) {
                 errorMsg = e.message
             } finally {
                 isLoading = false
             }
         }
-        Unit
     }
 
-    LaunchedEffect(Unit) {
-        loadTasks()
-    }
+    LaunchedEffect(Unit) { loadTasks() }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("My Tasks", style = MaterialTheme.typography.headlineMedium)
-            IconButton(onClick = loadTasks) {
-                Text("🔄") // Refresh icon
+    // Count stats
+    val activeCount = tasks.count { it.status in listOf("READY_FOR_EXECUTION", "EXECUTING") }
+    val pendingCount = tasks.count { it.status in listOf("NEEDS_PLAN_APPROVAL", "PLANNING") }
+    val doneCount = tasks.count { it.status == "DONE" }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text("KiLu Agent", style = MaterialTheme.typography.headlineSmall)
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onInboxClick) {
+                        Icon(Icons.Outlined.Inbox, contentDescription = "Inbox")
+                    }
+                    IconButton(onClick = { loadTasks() }) {
+                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
+            )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = onNewTaskClick,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = "New Task")
             }
         }
-
-        quotas?.let { q ->
-            Surface(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                shape = MaterialTheme.shapes.small
-            ) {
-                Row(modifier = Modifier.padding(8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Credits: P:${q.planner_credits} / R:${q.report_credits}", style = MaterialTheme.typography.labelSmall)
-                    Text("Today: ${q.calls_today}/${q.daily_limit}", style = MaterialTheme.typography.labelSmall)
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 16.dp)
+        ) {
+            // ── Stats Row ──
+            quotas?.let { q ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    StatCard(
+                        label = "Active",
+                        value = "$activeCount",
+                        color = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    StatCard(
+                        label = "Pending",
+                        value = "$pendingCount",
+                        color = com.kilu.pocketagent.core.ui.theme.StatusPending,
+                        modifier = Modifier.weight(1f)
+                    )
+                    StatCard(
+                        label = "Done",
+                        value = "$doneCount",
+                        color = com.kilu.pocketagent.core.ui.theme.StatusApproved,
+                        modifier = Modifier.weight(1f)
+                    )
+                    StatCard(
+                        label = "Credits",
+                        value = "${q.planner_credits}",
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            Button(onClick = onNewTaskClick) {
-                Text("New Task")
-            }
-            OutlinedButton(onClick = onInboxClick) {
-                Text("Inbox")
-            }
-            OutlinedButton(onClick = onPairHub) {
-                Text("Pair Hub")
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        if (errorMsg != null) {
-            Text("Error: $errorMsg", color = MaterialTheme.colorScheme.error)
-        }
-        
-        if (isLoading) {
-            CircularProgressIndicator()
-        } else {
-            LazyColumn(modifier = Modifier.weight(1f)) {
-                items(tasks) { task ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                            .clickable { onTaskClick(task.task_id, task.status) }
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text("ID: ${task.task_id.take(8)}...", style = MaterialTheme.typography.titleMedium)
-                            Text("Task: ${task.title ?: task.user_prompt ?: "Untitled"}", style = MaterialTheme.typography.bodySmall)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                "Status: ${task.status}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (task.status == "NEEDS_PLAN_APPROVAL") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
-                            )
 
-                            if (task.status == "DONE") {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                if (task.final_report_status == "DONE") {
-                                    Text("Report: ${task.final_report?.take(50)}...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
-                                } else if (task.final_report_status == "SUMMARIZING") {
-                                    Text("Generating Report...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
-                                } else {
-                                    Button(
-                                        onClick = {
-                                            scope.launch {
-                                                try {
-                                                    val req = Request.Builder()
-                                                        .url(apiClient.apiUrl("tasks/${task.task_id}/report/generate"))
-                                                        .post("{}".toByteArray().toRequestBody("application/json".toMediaType()))
-                                                        .build()
-                                                    apiClient.client.newCall(req).execute()
-                                                    loadTasks()
-                                                } catch (e: Exception) { /* ignore */ }
-                                            }
-                                        },
-                                        modifier = Modifier.height(32.dp),
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                                    ) {
-                                        Text("Generate AI Report", style = MaterialTheme.typography.labelSmall)
-                                    }
-                                }
-                            }
+            // ── Quick Actions ──
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onPairHub,
+                    modifier = Modifier.weight(1f),
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Text("Pair Hub")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // ── Error ──
+            if (errorMsg != null) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Text(
+                        text = errorMsg ?: "",
+                        modifier = Modifier.padding(12.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+            }
+
+            // ── Task List ──
+            if (isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(tasks) { task ->
+                        TaskCard(
+                            task = task,
+                            onClick = { onTaskClick(task.task_id, task.status) }
+                        )
+                    }
+
+                    if (tasks.isEmpty()) {
+                        item {
+                            EmptyState(
+                                icon = "📋",
+                                title = "No tasks yet",
+                                subtitle = "Tap + to create your first task"
+                            )
                         }
                     }
                 }
-                
-                if (tasks.isEmpty()) {
-                    item {
-                        Text("No tasks found. Create one to start!", style = MaterialTheme.typography.bodyLarge)
-                    }
-                }
             }
+        }
+    }
+}
+
+@Composable
+fun StatCard(
+    label: String,
+    value: String,
+    color: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(
+            containerColor = color.copy(alpha = 0.1f)
+        ),
+        shape = MaterialTheme.shapes.small
+    ) {
+        Column(
+            modifier = Modifier.padding(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = color
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
