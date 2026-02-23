@@ -187,7 +187,20 @@ fun NavGraph() {
                     navController.navigate("hub_unpaired") {
                         popUpTo("hub_home") { inclusive = true }
                     }
-                }
+                },
+                onResetPairing = {
+                    store.clearPairing()
+                    navController.navigate("hub_unpaired") {
+                        popUpTo("hub_home") { inclusive = true }
+                    }
+                },
+                onSwitchRole = {
+                    store.clearPairing()
+                    navController.navigate("role_select") {
+                        popUpTo("hub_home") { inclusive = true }
+                    }
+                },
+                onDiagnostics = { navController.navigate("diagnostics") }
             )
         }
 
