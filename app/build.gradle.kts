@@ -12,8 +12,8 @@ android {
         applicationId = "com.kilu.pocketagent"
         minSdk = 26
         targetSdk = 34
-        versionCode = 64
-        versionName = "0.6.4"
+        versionCode = 65
+        versionName = "0.6.5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -80,6 +80,14 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    applicationVariants.all {
+        val variant = this
+        variant.outputs.all {
+            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            output.outputFileName = "kilu-agent-${variant.flavorName}-v${variant.versionName}.apk"
+        }
+    }
 }
 
 dependencies {
@@ -105,6 +113,7 @@ dependencies {
     
     // QR
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
+    implementation("com.google.android.gms:play-services-base:18.3.0")
     implementation("com.google.zxing:core:3.5.3")
     
     // Biometric
