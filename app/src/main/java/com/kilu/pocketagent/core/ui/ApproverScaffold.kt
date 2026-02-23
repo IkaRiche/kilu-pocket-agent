@@ -2,6 +2,7 @@ package com.kilu.pocketagent.core.ui
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.outlined.Settings
@@ -56,6 +57,17 @@ fun ApproverScaffold(
                             unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     )
+                }
+            }
+        },
+        floatingActionButton = {
+            if (selectedTab == ApproverTab.TASKS) {
+                FloatingActionButton(
+                    onClick = onNewTaskClick,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = "New Task")
                 }
             }
         }
