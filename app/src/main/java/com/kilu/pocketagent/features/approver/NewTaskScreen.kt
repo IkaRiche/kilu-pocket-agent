@@ -1,6 +1,8 @@
 package com.kilu.pocketagent.features.approver
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -18,8 +20,11 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewTaskScreen(apiClient: ApiClient, onCreated: (String) -> Unit, onCancel: () -> Unit) {
+    var titleInput by remember { mutableStateOf("") }
+    var promptInput by remember { mutableStateOf("") }
     var urlInput by remember { mutableStateOf("") }
     var isSubmitting by remember { mutableStateOf(false) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
@@ -27,63 +32,118 @@ fun NewTaskScreen(apiClient: ApiClient, onCreated: (String) -> Unit, onCancel: (
     val scope = rememberCoroutineScope()
     val jsonParser = Json { ignoreUnknownKeys = true }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("Create Task", style = MaterialTheme.typography.headlineMedium)
-        Text("Collect & Report (Single URL)", style = MaterialTheme.typography.bodyMedium)
-        Spacer(modifier = Modifier.height(24.dp))
-        
-        OutlinedTextField(
-            value = urlInput,
-            onValueChange = { urlInput = it },
-            label = { Text("Target URL") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text("Report style is pinned to 'short' for MVP.", style = MaterialTheme.typography.bodySmall)
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // C4: Sample URLs for regression
-        Text("Sample URLs for testing:", style = MaterialTheme.typography.labelMedium)
-        Spacer(modifier = Modifier.height(8.dp))
-        val sampleUrls = listOf(
-            "https://en.wikipedia.org/wiki/Headless_browser",
-            "https://example.com",
-            "https://httpstat.us/403"
-        )
-        sampleUrls.forEach { purl ->
-            TextButton(
-                onClick = { urlInput = purl },
-                contentPadding = PaddingValues(0.dp),
-                modifier = Modifier.defaultMinSize(minHeight = 24.dp)
-            ) {
-                Text(purl, style = MaterialTheme.typography.bodySmall)
-            }
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("New Task") },
+                navigationIcon = {
+                    TextButton(onClick = onCancel) { Text("Cancel") }
+                }
+            )
         }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        if (errorMsg != null) {
-            Text("Error: $errorMsg", color = MaterialTheme.colorScheme.error)
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 16.dp)
+        ) {
+            // Title
+            OutlinedTextField(
+                value = titleInput,
+                onValueChange = { titleInput = it },
+                label = { Text("Task title") },
+                placeholder = { Text("e.g. Collect pricing from competitor") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Prompt
+            OutlinedTextField(
+                value = promptInput,
+                onValueChange = { promptInput = it },
+                label = { Text("What should the agent do?") },
+                placeholder = { Text("e.g. Go to the pricing page and extract all plan names and prices") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 3,
+                maxLines = 6
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // URL (optional, goes into inputs.base_url)
+            OutlinedTextField(
+                value = urlInput,
+                onValueChange = { urlInput = it },
+                label = { Text("Target URL (optional)") },
+                placeholder = { Text("https://example.com") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Quick templates
+            Text("Quick templates:", style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.height(8.dp))
-        }
-        
-        Spacer(modifier = Modifier.weight(1f))
-        
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            TextButton(onClick = onCancel, enabled = !isSubmitting) {
-                Text("Cancel")
+            
+            val templates = listOf(
+                Triple("Collect & Report", "Navigate to the URL and extract the main content. Summarize key information.", "https://en.wikipedia.org/wiki/Headless_browser"),
+                Triple("Check Pricing", "Find the pricing page and extract all plan names, prices, and features.", "https://example.com"),
+                Triple("Test Error Handling", "Attempt to visit the URL. Report what happened.", "https://httpstat.us/403")
+            )
+            templates.forEach { (title, prompt, url) ->
+                TextButton(
+                    onClick = {
+                        titleInput = title
+                        promptInput = prompt
+                        urlInput = url
+                    },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                ) {
+                    Text(title, style = MaterialTheme.typography.bodySmall)
+                }
             }
+
+            if (errorMsg != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                ) {
+                    Text(
+                        "Error: $errorMsg",
+                        modifier = Modifier.padding(12.dp),
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
             Button(
                 onClick = {
-                    if (urlInput.isBlank()) {
-                        errorMsg = "URL cannot be empty."
+                    if (titleInput.isBlank()) {
+                        errorMsg = "Title is required."
+                        return@Button
+                    }
+                    if (promptInput.isBlank()) {
+                        errorMsg = "Prompt is required."
                         return@Button
                     }
                     isSubmitting = true
                     errorMsg = null
                     scope.launch {
                         try {
-                            val reqPayload = CreateTaskReq(url = urlInput.trim())
+                            val inputs = if (urlInput.isNotBlank()) mapOf("base_url" to urlInput.trim()) else null
+                            val reqPayload = CreateTaskReq(
+                                title = titleInput.trim(),
+                                user_prompt = promptInput.trim(),
+                                executor_preference = "HUB_PREFERRED",
+                                inputs = inputs
+                            )
                             val req = Request.Builder()
                                 .url(apiClient.apiUrl("tasks"))
                                 .post(jsonParser.encodeToString(reqPayload).toByteArray().toRequestBody("application/json".toMediaType()))
@@ -98,15 +158,27 @@ fun NewTaskScreen(apiClient: ApiClient, onCreated: (String) -> Unit, onCancel: (
                                 errorMsg = ErrorHandler.parseError(resp)
                             }
                         } catch (e: Exception) {
-                            errorMsg = "Network Error: \${e.message}"
+                            errorMsg = "Network Error: ${e.message}"
                         } finally {
                             isSubmitting = false
                         }
                     }
                 },
-                enabled = !isSubmitting
+                enabled = !isSubmitting && titleInput.isNotBlank() && promptInput.isNotBlank(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+                    .height(48.dp)
             ) {
-                Text(if (isSubmitting) "Creating..." else "Create Task")
+                if (isSubmitting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                Text(if (isSubmitting) "Creating…" else "Create Task")
             }
         }
     }

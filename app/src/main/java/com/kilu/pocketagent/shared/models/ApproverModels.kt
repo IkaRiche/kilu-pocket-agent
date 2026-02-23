@@ -16,15 +16,18 @@ data class ApproverTaskItem(
 
 @Serializable
 data class CreateTaskReq(
-    val url: String,
-    val report_style: String = "short"
+    val title: String,
+    val user_prompt: String,
+    val executor_preference: String = "HUB_PREFERRED",
+    val skill_id: String? = null,
+    val inputs: Map<String, String>? = null
 )
 
 @Serializable
 data class CreateTaskResp(
     val task_id: String,
     val status: String,
-    val created_at: String
+    val version: Int = 0
 )
 
 @Serializable

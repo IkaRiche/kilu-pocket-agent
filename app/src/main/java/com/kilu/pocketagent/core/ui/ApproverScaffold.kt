@@ -71,6 +71,7 @@ fun ApproverScaffold(
             )
             ApproverTab.DEVICES -> DevicesScreen(
                 store = store,
+                apiClient = apiClient,
                 onPairHub = onPairHub,
                 onDiagnostics = onDiagnostics
             )
