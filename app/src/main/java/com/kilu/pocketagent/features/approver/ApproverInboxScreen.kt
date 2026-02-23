@@ -23,7 +23,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 
 @Composable
 fun ApproverInboxScreen(apiClient: ApiClient, onResolveRequested: (String) -> Unit, onBack: () -> Unit) {
-    var episodes by remember { mutableStateOf<List<InboxEpisode>>(emptyList()) }
+    var episodes by remember { mutableStateOf<List<InboxEvent>>(emptyList()) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     
@@ -75,7 +75,8 @@ fun ApproverInboxScreen(apiClient: ApiClient, onResolveRequested: (String) -> Un
             CircularProgressIndicator()
         } else {
             LazyColumn(modifier = Modifier.weight(1f)) {
-                items(episodes) { ep ->
+                items(episodes.size) { index ->
+                    val ep = episodes[index]
                     InboxCard(ep, apiClient, jsonParser, onAcked = { loadInbox() }, onResolveRequested = onResolveRequested)
                     Spacer(modifier = Modifier.height(8.dp))
                 }
