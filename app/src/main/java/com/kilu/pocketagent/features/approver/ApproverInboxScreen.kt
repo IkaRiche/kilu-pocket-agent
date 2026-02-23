@@ -8,7 +8,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.kilu.pocketagent.core.network.ApiClient
-import com.kilu.pocketagent.shared.models.InboxEpisode
+import com.kilu.pocketagent.shared.models.InboxEvent
+import com.kilu.pocketagent.shared.models.InboxResponse
 import com.kilu.pocketagent.shared.models.ResultPayloadView
 import com.kilu.pocketagent.shared.utils.ErrorHandler
 import kotlinx.coroutines.Dispatchers
@@ -41,9 +42,9 @@ fun ApproverInboxScreen(apiClient: ApiClient, onResolveRequested: (String) -> Un
                 val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }
                 
                 if (resp.isSuccessful) {
-                    val bodyStr = resp.body?.string() ?: "[]"
-                    val rawEvents = jsonParser.decodeFromString<List<InboxEpisode>>(bodyStr)
-                    episodes = rawEvents.distinctBy { it.episode_id }
+                    val bodyStr = resp.body?.string() ?: "{\"events\":[]}"
+                    val inboxResp = jsonParser.decodeFromString<InboxResponse>(bodyStr)
+                    episodes = inboxResp.events.distinctBy { it.event_id }
                 } else {
                     errorMsg = ErrorHandler.parseError(resp)
                 }
@@ -92,10 +93,12 @@ fun ApproverInboxScreen(apiClient: ApiClient, onResolveRequested: (String) -> Un
 }
 
 @Composable
-fun InboxCard(ep: InboxEpisode, apiClient: ApiClient, jsonParser: Json, onAcked: () -> Unit, onResolveRequested: ((String) -> Unit)? = null) {
+fun InboxCard(ep: InboxEvent, apiClient: ApiClient, jsonParser: Json, onAcked: () -> Unit, onResolveRequested: ((String) -> Unit)? = null) {
     var isExpanded by remember { mutableStateOf(false) }
     var rawExpanded by remember { mutableStateOf(false) }
+    var isAcked by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val taskId = ep.payload?.get("task_id")?.toString()?.trim('"') ?: ""
     
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -105,9 +108,9 @@ fun InboxCard(ep: InboxEpisode, apiClient: ApiClient, jsonParser: Json, onAcked:
                     style = MaterialTheme.typography.titleMedium, 
                     color = if (ep.event_type == "RESULT_READY") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                 )
-                if (ep.requires_ack) Text("NEW", color = MaterialTheme.colorScheme.error)
+                if (!isAcked) Text("NEW", color = MaterialTheme.colorScheme.error)
             }
-            Text("Task: \${ep.task_id.take(8)}...", style = MaterialTheme.typography.bodySmall)
+            if (taskId.isNotEmpty()) Text("Task: ${taskId.take(8)}…", style = MaterialTheme.typography.bodySmall)
             Text(ep.created_at, style = MaterialTheme.typography.bodySmall)
             
             Spacer(modifier = Modifier.height(8.dp))
@@ -145,7 +148,7 @@ fun InboxCard(ep: InboxEpisode, apiClient: ApiClient, jsonParser: Json, onAcked:
                 }
             }
             
-            if (ep.requires_ack) {
+            if (!isAcked) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = {
@@ -153,11 +156,12 @@ fun InboxCard(ep: InboxEpisode, apiClient: ApiClient, jsonParser: Json, onAcked:
                             try {
                                 val req = Request.Builder()
                                     .url(apiClient.apiUrl("inbox/ack"))
-                                    .post("{\"episode_id\":\"\${ep.episode_id}\"}".toRequestBody("application/json".toMediaType()))
+                                    .post("{\"event_id\":\"${ep.event_id}\"}".toRequestBody("application/json".toMediaType()))
                                     .build()
                                 val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }
                                 if (resp.isSuccessful) {
                                     isExpanded = true
+                                    isAcked = true
                                     onAcked()
                                 }
                             } catch (e: Exception) { }
@@ -167,7 +171,7 @@ fun InboxCard(ep: InboxEpisode, apiClient: ApiClient, jsonParser: Json, onAcked:
                     }
                     
                     if (ep.event_type == "ASSUMPTIONS_REQUIRED" && onResolveRequested != null) {
-                        OutlinedButton(onClick = { onResolveRequested(ep.task_id) }) {
+                        OutlinedButton(onClick = { if (taskId.isNotEmpty()) onResolveRequested(taskId) }) {
                             Text("Resolve")
                         }
                     }
@@ -178,7 +182,7 @@ fun InboxCard(ep: InboxEpisode, apiClient: ApiClient, jsonParser: Json, onAcked:
                         Text(if (isExpanded) "Hide Details" else "View Details")
                     }
                     if (ep.event_type == "ASSUMPTIONS_REQUIRED" && onResolveRequested != null) {
-                        TextButton(onClick = { onResolveRequested(ep.task_id) }) {
+                        TextButton(onClick = { if (taskId.isNotEmpty()) onResolveRequested(taskId) }) {
                             Text("Resolve Issues")
                         }
                     }

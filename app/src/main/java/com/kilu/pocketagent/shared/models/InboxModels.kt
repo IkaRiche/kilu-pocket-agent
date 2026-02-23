@@ -4,14 +4,20 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
 @Serializable
-data class InboxEpisode(
-    val episode_id: String,
-    val task_id: String,
+data class InboxResponse(
+    val events: List<InboxEvent> = emptyList()
+)
+
+@Serializable
+data class InboxEvent(
+    val event_id: String,
     val event_type: String, // RESULT_READY, ASSUMPTIONS_REQUIRED, PLAN_APPROVAL_REQUIRED
     val created_at: String,
-    val requires_ack: Boolean,
     val payload: JsonObject? = null
 )
+
+// Legacy alias for backwards compatibility
+typealias InboxEpisode = InboxEvent
 
 @Serializable
 data class ResultPayloadView(
