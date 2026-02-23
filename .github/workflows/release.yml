@@ -68,34 +68,35 @@ jobs:
 
       - name: Generate Checksums and Prepare Artifacts
         run: |
-          APK_PATH="app/build/outputs/apk/prod/release/app-prod-release.apk"
-          if [ -f "$APK_PATH" ]; then
-            sha256sum "$APK_PATH" > SHA256SUMS.txt
-            cp "$APK_PATH" .
-            # Format the output just to be absolutely clean with strictly the basename
-            SHA256_HASH=$(awk '{print $1}' SHA256SUMS.txt)
-            echo "$SHA256_HASH  app-prod-release.apk" > SHA256SUMS.txt
-          else
-            echo "Error: APK not found at $APK_PATH"
+          APK_PATH=$(find app/build/outputs/apk/prod/release -name "kilu-agent-*.apk" | head -1)
+          if [ -z "$APK_PATH" ]; then
+            echo "Error: No kilu-agent APK found"
+            ls -la app/build/outputs/apk/prod/release/ || true
             exit 1
           fi
+          APK_NAME=$(basename "$APK_PATH")
+          echo "Found APK: $APK_NAME"
+          sha256sum "$APK_PATH" > SHA256SUMS.txt
+          cp "$APK_PATH" .
+          SHA256_HASH=$(awk '{print $1}' SHA256SUMS.txt)
+          echo "$SHA256_HASH  $APK_NAME" > SHA256SUMS.txt
+          echo "APK_NAME=$APK_NAME" >> $GITHUB_ENV
 
       - name: Extract Release Notes from Changelog
         id: parse_changelog
         run: |
-          # Very basic parsing: extracts lines between the current version and the previous one
           VERSION_RAW=${GITHUB_REF#refs/tags/v}
           if [ -f "CHANGELOG.md" ]; then
-            awk "/^## \\[$VERSION_RAW\\]/{flag=1; next} /^## \\[[0-9]/{flag=0} flag" CHANGELOG.md > release_notes.txt
+            awk "/^## \[$VERSION_RAW\]/{flag=1; next} /^## \[[0-9]/{flag=0} flag" CHANGELOG.md > release_notes.txt
           else
-            echo "Automated release builder for KiLu Pocket Agent ($GITHUB_REF)." > release_notes.txt
+            echo "Automated release for KiLu Pocket Agent ($GITHUB_REF)." > release_notes.txt
           fi
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            app-prod-release.apk
+            ${{ env.APK_NAME }}
             SHA256SUMS.txt
           body_path: release_notes.txt
         env:
