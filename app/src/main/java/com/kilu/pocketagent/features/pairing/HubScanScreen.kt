@@ -28,7 +28,6 @@ fun HubScanScreen(onScanSuccess: (QRPayload) -> Unit) {
         try {
             val options = GmsBarcodeScannerOptions.Builder()
                 .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
-                .enableAutoZoom()
                 .build()
             val scanner = GmsBarcodeScanning.getClient(context, options)
             scanner.startScan()
