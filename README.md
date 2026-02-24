@@ -1,73 +1,105 @@
-# KiLu Pocket Agent
+<div align="center">
 
-![GitHub release (latest by date)](https://img.shields.io/github/v/release/IkaRiche/kilu-pocket-agent?color=success&style=flat-square)
-![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/IkaRiche/kilu-pocket-agent/release.yml?branch=main&style=flat-square)
-![License](https://img.shields.io/github/license/IkaRiche/kilu-pocket-agent?style=flat-square)
+# 📱 KiLu Pocket Agent
 
-**KiLu Pocket Agent** is the dual-role native Android client for the KiLu Network Cloud Control Plane. It allows users to turn any Android device into either a secure Approver (which cryptographic signs operation plans using its local Keystore) or an autonomous Hub Runtime (which automatically extracts web data based on authorized plans).
+**The native Android client for the KiLu Network Cloud Control Plane.**
 
-## Table of Contents
-- [Architecture](#architecture)
-- [Dual-Role System](#dual-role-system)
-- [Repository Structure](#repository-structure)
-- [Security Disclaimer](#security-disclaimer)
-- [Deployment & Releases](#deployment--releases-v0x)
-- [Contributing](CONTRIBUTING.md)
+[![Release](https://img.shields.io/github/v/release/IkaRiche/kilu-pocket-agent?color=success&style=for-the-badge)](https://github.com/IkaRiche/kilu-pocket-agent/releases/latest)
+[![CI/CD Status](https://img.shields.io/github/actions/workflow/status/IkaRiche/kilu-pocket-agent/release.yml?branch=main&style=for-the-badge&logo=github)](https://github.com/IkaRiche/kilu-pocket-agent/actions)
+[![Kotlin](https://img.shields.io/badge/Kotlin-1.9+-blue.svg?style=for-the-badge&logo=kotlin)](https://kotlinlang.org)
+[![Platform](https://img.shields.io/badge/Platform-Android%208.0+-green.svg?style=for-the-badge&logo=android)](https://www.android.com/)
+[![License](https://img.shields.io/github/license/IkaRiche/kilu-pocket-agent?style=for-the-badge)](LICENSE)
 
-## Architecture
+[Features](#-key-features) • [Architecture](#-architecture) • [Installation](#-installation) • [Dual-Role System](#-dual-role-system) • [Security](#-security-model)
 
-This application is built with:
-*   **Language**: Native Kotlin.
-*   **UI Framework**: Jetpack Compose and Navigation Compose.
-*   **Network**: OkHttp and `kotlinx.serialization`.
-*   **Security & Crypto**: AndroidX Security Crypto (`EncryptedSharedPreferences`) and local Ed25519 signing (via Bouncy Castle / Tink / Keystore).
-*   **Computer Vision**: Google Play Services ML Kit for blazing-fast QR code scanning, and ZXing for QR code generation.
+</div>
 
-## Dual-Role System
+---
 
-1.  **APPROVER (Master Device)**
-    *   Generates an identity keypair using the Android Keystore.
-    *   Initiates Pairing to add Hubs.
-    *   Receives tasks and prompts the user to biometrically approve constraints (e.g., domain limits, execution boundaries).
-    *   Signs the `Plan` and submits the `WindowGrant` to the Cloud Control Plane.
-    *   Receives execution results in the local Inbox.
-2.  **HUB (Execution Worker)**
-    *   Scans the Approver's QR Code to securely pair with the user's specific tenant.
-    *   Silently polls the Control Plane queue for `READY_FOR_EXECUTION` tasks.
-    *   Executes browser operations internally autonomously (via Android WebView and local JS evaluation).
-    *   Escalates assumptions to the Approver when blocked (e.g. by new Captchas or Paywalls).
+## 💡 Overview
 
-## Repository Structure
+**KiLu Pocket Agent** turns any Android device into an active node on the KiLu Network. It operates in a unique **Dual-Role System**, allowing a device to act either as a completely secure **Approver** (cryptographically signing operations) or as an autonomous **Hub Runtime** (executing authorized web data extraction tasks).
 
-*   `app/src/main/java.../`
-    *   `core/`: App-wide utilities, including OkHttp clients, API interceptors, Encrypted Preferences (`DeviceProfileStore`), Crypto operations, and QR scaffolding.
-    *   `features/`: Specific UI domains including Onboarding (Welcome, Role Selection), Pairing (QR Display & Scanning).
-    *   `shared/models/`: Strongly-typed Data Transfer Objects aligned with Cloud Control Plane JSON Schemas.
+Built entirely with native Kotlin and Jetpack Compose, the Pocket Agent delivers blazing-fast performance, deep OS integration, and uncompromising cryptographic security.
 
-## Security Disclaimer
+## ✨ Key Features
 
-**"Thin client, thick cloud"**: The Pocket Agent relies entirely on the external Cloud Control Plane for state tracking, rate limiting, duplicate protection, and revocation checks. The pocket agent *does not* handle sensitive backend billing operations or API token provisioning directly.
+*   🛡️ **Hardware-Backed Security:** Utilizes AndroidX Security Crypto and the Android Keystore for secure Ed25519 identity generation and plan signing.
+*   🔄 **Dual-Node Architecture:** Instantly switch between an administrative Approver interface and a silent, background Hub worker.
+*   📱 **Native Performance:** Written in 100% Kotlin using the latest Jetpack Compose UI paradigms.
+*   📷 **Rapid Pairing:** Seamless device pairing using Google Play Services ML Kit for instantaneous QR code scanning.
+*   🔒 **Biometric Authentication:** Requires physical biometric verification (fingerprint/face) prior to authorizing any operational bounds.
+*   🌐 **Autonomous Execution:** Hub devices evaluate JS and perform browser operations internally via Android WebView without external dependencies.
 
-## Deployment & Releases (v0.x)
+## 🏗️ Architecture
 
-The project leverages automated **GitHub Releases** matching tags like `v*` (e.g. `v0.3.6`).
+The application is modularly structured to enforce separation of concerns and maintain a "thin client, thick cloud" philosophy.
 
-### Release Checklist
-Before creating and pushing a new tag, complete the following manually:
-1. Ensure the `versionCode` and `versionName` in `app/build.gradle.kts` are updated strictly monotonically.
-2. Edit `CHANGELOG.md` reflecting the new version exactly as formatted (helps the automated release extractor).
-3. Test locally against the cloud-control-plane.
-4. Push changes (`git commit -m "chore: bump to v0.3.6" && git push`).
+*   **`core/`**: App-wide network utilities (OkHttp), state management, Encrypted Preferences (`DeviceProfileStore`), cryptographic operations, and QR scaffolding.
+*   **`features/`**: Isolated UI domains:
+    *   `onboarding`: Welcome flows and Node Role selection.
+    *   `pairing`: QR Display (Approver) & Scanning (Hub).
+    *   `approver`: Task Inbox, Plan Preview, and Biometric Signing.
+    *   `hub`: Background polling and execution engine.
+*   **`shared/`**: Strongly-typed Data Transfer Objects (DTOs) utilizing `kotlinx.serialization` to strictly mirror Cloud Control Plane JSON schemas.
 
-### Triggering the Release
+## 🎭 Dual-Role System
+
+The Pocket Agent network relies on two distinct identities:
+
+### 1. The Approver (Master Node)
+The command center. 
+* Generates a unique Ed25519 identity keypair anchored in the Android Keystore.
+* Generates pairing QR codes to onboard Hub workers.
+* Reviews incoming execution `Plan`s.
+* Prompts the user for biometric authorization to sign execution boundaries (e.g., domain whitelists).
+* Submits the cryptographic `WindowGrant` to the Cloud Control Plane.
+
+### 2. The Hub (Execution Node)
+The worker engine.
+* Scans an Approver's QR Code to securely bind to a specific tenant identity.
+* Polls the Control Plane for `READY_FOR_EXECUTION` tasks.
+* Autonomously executes tasks sequentially.
+* Escalates edge-case assumptions (like solving captchas or handling login prompts) back to the Approver.
+
+## 🚀 Installation
+
+### Download the Latest APK
+You can always find the latest automatically built, signed, and hashed production APK in the [Releases](https://github.com/IkaRiche/kilu-pocket-agent/releases) tab.
+
+### Build from Source
+If you prefer to build the agent yourself:
+
 ```bash
-git tag v0.3.6
-git push origin v0.3.6
+# Clone the repository
+git clone https://github.com/IkaRiche/kilu-pocket-agent.git
+cd kilu-pocket-agent
+
+# Build the development Debug APK
+./gradlew assembleDevDebug
+
+# (Optional) Build the Production Release APK
+./gradlew assembleProdRelease
 ```
 
-The GitHub Actions workflow `.github/workflows/release.yml` will automatically:
-1. Decode the secure Keystore securely injected via `ANDROID_KEYSTORE_B64`.
-2. Ensure strict `versionCode` increments from prior build configs safely.
-3. Build the `prodRelease` (`app-prod-release.apk`) pointing statically to `https://kilu-control-plane.heizungsrechner.workers.dev`.
-4. Run `sha256sum` generating deterministic hashing via `SHA256SUMS.txt`.
-5. Mount the artifacts to the GitHub Release.
+## 🔐 Security Model
+
+**"Thin client, thick cloud."**
+
+The Pocket Agent is intentionally designed to hold minimal state. 
+* **No local billing logic**: All rate limiting, quota enforcement, and tier checking happens exclusively on the Cloud Control Plane.
+* **No persistent API tokens**: Execution tokens are granted strictly per-task and revoked upon completion.
+* **No key extraction**: Private keys never leave the Android Hardware-Backed Keystore. Signatures are generated entirely within the Secure Enclave.
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details on how to submit pull requests, report bugs, and suggest new features.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+<div align="center">
+  <sub>Built with ❤️ by the KiLu Network Team</sub>
+</div>
