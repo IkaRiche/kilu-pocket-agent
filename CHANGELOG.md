@@ -2,6 +2,15 @@
 
 All notable changes to KiLu Pocket Agent.
 
+## [0.8.0] — 2026-02-24
+
+### Added
+- UX overhaul for presentation and trust.
+- Comprehensive Proof Docs (GUARANTEES, THREAT_MODEL, BENCHMARKS).
+- Pairing fixes and secure keystore scrubbing.
+- Local LLM advisory provider support (Optional).
+- One-command quickstart `demo.sh`.
+
 ## [0.6.2] — 2026-02-22
 
 ### Fixed
