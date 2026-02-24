@@ -124,7 +124,7 @@ fun NavGraph() {
             com.kilu.pocketagent.features.approver.NewTaskScreen(
                 apiClient = apiClient,
                 onCreated = { taskId ->
-                    navController.navigate("approver_plan/\$taskId") {
+                    navController.navigate("approver_plan/$taskId") {
                         popUpTo("approver_home")
                     }
                 },
@@ -148,7 +148,7 @@ fun NavGraph() {
             com.kilu.pocketagent.features.approver.ApproverInboxScreen(
                 apiClient = apiClient,
                 onResolveRequested = { taskId ->
-                    navController.navigate("approver_resolve/\$taskId")
+                    navController.navigate("approver_resolve/$taskId")
                 },
                 onBack = { navController.navigateUp() }
             )

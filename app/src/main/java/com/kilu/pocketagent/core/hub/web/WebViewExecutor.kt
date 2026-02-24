@@ -77,8 +77,8 @@ class WebViewExecutor(private val context: Context) {
                 override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                     super.onPageStarted(view, url, favicon)
                     val lowerUrl = url?.toLowerCase() ?: ""
-                    if (lowerUrl.contains("/login") || lowerUrl.contains("/signin") || lowerUrl.contains("/auth")) {
-                        currentHttpError = "URL redirect suggests Auth: \$url"
+                    if (url.contains("login") || url.contains("auth")) {
+                        currentHttpError = "URL redirect suggests Auth: $url"
                     }
                 }
 
@@ -109,8 +109,8 @@ class WebViewExecutor(private val context: Context) {
                     super.onReceivedHttpError(view, request, errorResponse)
                     if (request?.isForMainFrame == true) {
                         val code = errorResponse?.statusCode ?: 0
-                        if (code == 401 || code == 403 || code == 429) {
-                            currentHttpError = "HTTP Error \$code on main frame"
+                        if (request.isForMainFrame) {
+                            currentHttpError = "HTTP Error $code on main frame"
                         }
                     }
                 }
@@ -122,7 +122,7 @@ class WebViewExecutor(private val context: Context) {
                 ) {
                     super.onReceivedError(view, request, error)
                     if (request?.isForMainFrame == true) {
-                        currentHttpError = "Page Load Error: \${error?.errorCode}"
+                        currentHttpError = "Page Load Error: ${error?.errorCode}"
                     }
                 }
             }
@@ -131,11 +131,11 @@ class WebViewExecutor(private val context: Context) {
 
             CoroutineScope(Dispatchers.Main).launch {
                 delay(pageLoadTimeoutMs)
-                if (!finished) {
+                if (continuation.isActive && !finished) {
                     finished = true
                     webView?.stopLoading()
                     state = ExecutionState.FAILED
-                    continuation.resume(Result.failure(Exception("pageLoadTimeout of \${pageLoadTimeoutMs}ms exceeded. Site might be blocked.")))
+                    continuation.resume(Result.failure(Exception("pageLoadTimeout of ${pageLoadTimeoutMs}ms exceeded. Site might be blocked.")))
                 }
             }
         }

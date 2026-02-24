@@ -32,7 +32,7 @@ object CryptoUtils {
             verifier.update(messageBytes, 0, messageBytes.size)
             verifier.verifySignature(sigBytes)
         } catch (e: Exception) {
-            Log.e("CryptoUtils", "Server sig verification exception: \${e.message}")
+            Log.e("CryptoUtils", "Server sig verification exception: ${e.message}")
             false
         }
     }

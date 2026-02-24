@@ -49,7 +49,7 @@ fun AssumptionResolutionScreen(
         
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("Task: \${taskId.take(8)}...", style = MaterialTheme.typography.titleMedium)
+                Text("Task: ${taskId.take(8)}...", style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("The Hub execution node triggered a security heuristic or page timeout.")
                 Spacer(modifier = Modifier.height(8.dp))
@@ -119,7 +119,7 @@ fun AssumptionResolutionScreen(
                             }
                         } catch (e: Exception) {
                             withContext(Dispatchers.Main) {
-                                errorMsg = "Network Error: \${e.message}"
+                                errorMsg = "Network Error: ${e.message}"
                             }
                         } finally {
                             withContext(Dispatchers.Main) {

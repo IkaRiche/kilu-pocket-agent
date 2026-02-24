@@ -2,6 +2,12 @@
 
 All notable changes to KiLu Pocket Agent.
 
+## [0.8.1] — 2026-02-24
+
+### Fixed
+- **Critical Run-time Bug**: Fixed string interpolation escaping (`\$taskId` to `$taskId`) in `NavGraph` which caused tasks not to be found after creation, restoring full task approval flow.
+- Minor log string interpolations repaired in `WakelockGuard`, `WebViewExecutor`, `CryptoUtils`.
+
 ## [0.8.0] — 2026-02-24
 
 ### Added

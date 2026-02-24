@@ -13,9 +13,9 @@ class WakelockGuard(context: Context, tag: String = "KiLu:HubWakeLockGuard") {
     private val wakeLock: PowerManager.WakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, tag)
 
     fun acquire(timeoutMs: Long = 120_000L) {
-        if (!wakeLock.isHeld) {
-            Log.d("WakelockGuard", "Acquiring Wakelock for max \${timeoutMs}ms")
-            wakeLock.acquire(timeoutMs)
+        if (wakeLock?.isHeld == false) {
+            Log.d("WakelockGuard", "Acquiring Wakelock for max ${timeoutMs}ms")
+            wakeLock?.acquire(timeoutMs)
         }
     }
 
@@ -25,7 +25,7 @@ class WakelockGuard(context: Context, tag: String = "KiLu:HubWakeLockGuard") {
                 wakeLock.release()
                 Log.d("WakelockGuard", "Wakelock normally released")
             } catch (e: Exception) {
-                Log.e("WakelockGuard", "Failed to release wakelock: \${e.message}")
+                Log.e("WakelockGuard", "Failed to release wakelock: ${e.message}")
             }
         }
     }

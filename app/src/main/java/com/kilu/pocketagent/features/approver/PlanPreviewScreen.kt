@@ -127,7 +127,7 @@ fun PlanPreviewScreen(
                                 val authSuccess = BiometricGate.confirm(
                                     activity,
                                     "Approve Plan",
-                                    "Authorize Hub to execute \${planData!!.max_steps} steps autonomously."
+                                    "Authorize Hub to execute ${planData!!.max_steps} steps autonomously."
                                 )
                                 
                                 if (!authSuccess) {
@@ -159,7 +159,7 @@ fun PlanPreviewScreen(
                                 }
                                 
                             } catch (e: Exception) {
-                                errorMsg = "Crash: \${e.message}"
+                                errorMsg = "Crash: ${e.message}"
                             } finally {
                                 isApproving = false
                             }
