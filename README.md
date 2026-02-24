@@ -1,130 +1,208 @@
-<div align="center">
+# KiLu Pocket Agent
+**The end of god-mode agents.**  
+A split-trust mobile agent where **the cloud can think**, but **the phone can only act with cryptographic authority**.
 
-# 📱 KiLu Pocket Agent
+> KiLu separates *brains* from *hands*:  
+> **Hub** executes in a constrained sandbox.  
+> **Approver** holds keys and confirms intent with biometrics.  
+> **Control Plane** enforces deterministic policy and issues single-use capability tokens.
 
-**The native Android client for the KiLu Network Cloud Control Plane.**
+<p align="center">
+  <!-- Replace with a real GIF or short mp4 poster -->
+  <img src="assets/hero.gif" width="720" alt="KiLu demo: attack → blocked → approve → evidence" />
+</p>
 
-[![Release](https://img.shields.io/github/v/release/IkaRiche/kilu-pocket-agent?color=success&style=for-the-badge)](https://github.com/IkaRiche/kilu-pocket-agent/releases/latest)
-[![CI/CD Status](https://img.shields.io/github/actions/workflow/status/IkaRiche/kilu-pocket-agent/release.yml?branch=main&style=for-the-badge&logo=github)](https://github.com/IkaRiche/kilu-pocket-agent/actions)
-[![Kotlin](https://img.shields.io/badge/Kotlin-1.9+-blue.svg?style=for-the-badge&logo=kotlin)](https://kotlinlang.org)
-[![Platform](https://img.shields.io/badge/Platform-Android%208.0+-green.svg?style=for-the-badge&logo=android)](https://www.android.com/)
-[![License](https://img.shields.io/github/license/IkaRiche/kilu-pocket-agent?style=for-the-badge)](LICENSE)
-
-[Quickstart](#-quickstart-demo) • [Architecture](#-architecture) • [Security & Guarantees](GUARANTEES.md)
-
-</div>
+<p align="center">
+  <a href="https://github.com/IkaRiche/kilu-pocket-agent/releases/latest"><img alt="version" src="https://img.shields.io/github/v/release/IkaRiche/kilu-pocket-agent?color=purple&style=flat-square"></a>
+  <a href="https://github.com/IkaRiche/kilu-pocket-agent/actions"><img alt="build" src="https://img.shields.io/github/actions/workflow/status/IkaRiche/kilu-pocket-agent/release.yml?branch=main&style=flat-square"></a>
+  <a href="SECURITY.md"><img alt="security" src="https://img.shields.io/badge/security-by--design-black?style=flat-square"></a>
+  <a href="LICENSE"><img alt="license" src="https://img.shields.io/github/license/IkaRiche/kilu-pocket-agent?style=flat-square"></a>
+</p>
 
 ---
 
-## 💡 The Vision: Split-Trust Mobile Data Extraction
+## Why this exists
+Most "agent frameworks" implicitly grant the LLM **god-mode**: unlimited tool access, long feedback loops, and high-variance behavior.
 
-**KiLu Pocket Agent** turns any Android device into an active node on the KiLu Network. It operates in a unique **Dual-Role System**, splitting trust between an administrative **Approver** (cryptographically signing operations) and an autonomous **Hub Runtime** (executing authorized web tasks).
+KiLu is built for the opposite:
+- **Authority is explicit** (capability tokens + human signatures).
+- **Execution is constrained** (Hub refuses without cryptographic mandate).
+- **Outcomes are auditable** (evidence hashes + receipts).
 
-**Three Core Promises:**
-1. 🛡️ **Split-Trust Verification:** Hub workers cannot execute internet tasks without point-in-time cryptographic consent from the Approver.
-2. ⛓️ **Hard Capability Bounds:** Executions are constrained at the network layer to explicitly whitelisted domains and methods.
-3. 📜 **Tamper-Evident Ledgers:** All decisions and extracted data are deterministically signed, enabling verifiable audit trails.
+If you care about **security**, **predictable cost**, and **verifiable intent**, this architecture is the point.
 
-> 📺 *[Insert 30-second Demo Video/GIF here showing the Attack → Block → Approve → Evidence flow]*
+---
 
-## 🚀 Quickstart: Demo
+## What you get
+- **Split-trust**: Planner ≠ Executor ≠ Human authority.
+- **Fail-closed execution**: no valid StepToken → no execution.
+- **Replay protection**: single-use JTI + expiry on every capability.
+- **Tamper-evident results**: evidence hashes bound to each step/result.
+- **Human-gated**: approvals require biometric presence + signature.
+- **LLM-agnostic**: works with cloud LLMs or local models (see [Local LLM mode](#local-llm-mode-no-paid-api-keys)).
 
-Want to see the Split-Trust mechanism in action? 
+> Important: KiLu does **not** rely on "trust the model". It relies on **cryptographic constraints**.
 
-1. **Install the APK** from the [Latest Release](https://github.com/IkaRiche/kilu-pocket-agent/releases/latest).
-2. **Open the Agent** and select the "Approver" role.
-3. **Open the Agent on a second device** (or secondary profile) and select "Hub Worker".
-4. **Scan to Pair:** Scan the Approver's QR code with the Hub device.
+---
 
-*Try triggering an unauthorized extraction task via the Cloud Control Plane API. Watch the Hub escalate the permission request to the Approver for biometric signature.*
-
-## 🏗️ Architecture
-
+## Architecture (Zero-Trust Split-Trust)
 ```mermaid
-sequenceDiagram
-    participant H as Hub Worker (Android)
-    participant C as Cloud Control Plane
-    participant A as Approver (Android)
+flowchart LR
+  subgraph Cloud["☁️ Control Plane (policy + issuance)"]
+    P1["Policy Engine\n(normalization, allowlist, budgets)"]
+    P2["Capability Minting\nStepToken(JTI, exp, scopes)"]
+    P3["Audit Store\n(episodes, receipts, evidence hashes)"]
+  end
 
-    H->>C: Poll Queue (Get Task)
-    C-->>H: Return Task (Untrusted)
-    H->>A: Evaluate Security Assumption (Escalation)
-    Note over A: User reviews boundaries<br/>& Biometric Auth
-    A->>C: Sign & Submit WindowGrant (Ed25519)
-    C->>C: Verify Payload Signature
-    C-->>H: Grant Issued. Execution Authorized.
+  subgraph Hub["📱 Hub (Executor)"]
+    H1["WebView Sandbox\nExtract-only digest"]
+    H2["StepToken Validator\nfail-closed"]
+    H3["Evidence Builder\nsha256 artifacts"]
+    H4["(Optional) Local LLM\ncompress/plan/risk-hints"]
+  end
+
+  subgraph Approver["📱 Approver (Human Authority)"]
+    A1["Key Store\n(device-local keys)"]
+    A2["Biometric Gate\npresence check"]
+    A3["AVO Review Card\ncanonical intent + scope"]
+    A4["Signed Approval Receipt\nEd25519"]
+    A5["(Optional) Local LLM\nexplain + risk hints"]
+  end
+
+  P1 --> P2
+  P2 -->|StepToken batch| H2
+  H1 -->|digest + hashes| P1
+  H2 --> H1
+  H2 -->|execute| H1
+  H3 -->|evidence hash + result| P3
+  P3 -->|AVO request| A3
+  A2 --> A4
+  A4 -->|approval receipt| P3
+  A3 --> A2
+  A3 -->|reject| P3
 ```
 
-The application is modularly structured to enforce separation of concerns and maintain a "thin client, thick cloud" philosophy:
-*   **`core/`**: App-wide network utilities (OkHttp), state management, Encrypted Preferences (`DeviceProfileStore`), cryptographic operations, and QR scaffolding.
-*   **`features/`**: Isolated UI domains (Onboarding, Pairing, Approver, Hub).
-*   **`shared/`**: Strongly-typed Data Transfer Objects (DTOs) strictly mirroring Cloud Control Plane JSON schemas.
+## Three guarantees (with proof)
 
-### 🔐 Security Posture
+1. **Fail-closed**: without a valid StepToken, Hub refuses execution.
+2. **Replay-proof**: each capability is single-use (JTI) and time-bounded (exp).
+3. **Tamper-evident**: every output is bound to evidence hashes and receipts.
 
-*   **Identities at Rest:** Currently leverages AndroidX Security Crypto (`EncryptedSharedPreferences`) mapped to AES-256-GCM. 
-*   **Roadmap (v1.0):** Transitioning Ed25519 key generation strictly into the Android Hardware-Backed Keystore (non-exportable Secure Enclave keys).
-*   **Network:** All interactions require dynamic execution tokens granted per-task and revoked upon completion. No persistent API tokens are stored on the Hub.
-
-See [GUARANTEES.md](GUARANTEES.md) and [THREAT_MODEL.md](THREAT_MODEL.md) for full architectural proof schemas.
-
-## 🎭 Dual-Role System
-
-The Pocket Agent network relies on two distinct identities:
-
-### 1. The Approver (Master Node)
-The command center. 
-* Generates a unique Ed25519 identity keypair anchored in the Android Keystore.
-* Generates pairing QR codes to onboard Hub workers.
-* Reviews incoming execution `Plan`s.
-* Prompts the user for biometric authorization to sign execution boundaries (e.g., domain whitelists).
-* Submits the cryptographic `WindowGrant` to the Cloud Control Plane.
-
-### 2. The Hub (Execution Node)
-The worker engine.
-* Scans an Approver's QR Code to securely bind to a specific tenant identity.
-* Polls the Control Plane for `READY_FOR_EXECUTION` tasks.
-* Autonomously executes tasks sequentially.
-* Escalates edge-case assumptions (like solving captchas or handling login prompts) back to the Approver.
-
-## 🚀 Installation
-
-### Download the Latest APK
-You can always find the latest automatically built, signed, and hashed production APK in the [Releases](https://github.com/IkaRiche/kilu-pocket-agent/releases) tab.
-
-### Build from Source
-If you prefer to build the agent yourself:
-
-```bash
-# Clone the repository
-git clone https://github.com/IkaRiche/kilu-pocket-agent.git
-cd kilu-pocket-agent
-
-# Build the development Debug APK
-./gradlew assembleDevDebug
-
-# (Optional) Build the Production Release APK
-./gradlew assembleProdRelease
-```
-
-## 🔐 Security Model
-
-**"Thin client, thick cloud."**
-
-The Pocket Agent is intentionally designed to hold minimal state. 
-* **No local billing logic**: All rate limiting, quota enforcement, and tier checking happens exclusively on the Cloud Control Plane.
-* **No persistent API tokens**: Execution tokens are granted strictly per-task and revoked upon completion.
-* **No key extraction**: Private keys never leave the Android Hardware-Backed Keystore. Signatures are generated entirely within the Secure Enclave.
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details on how to submit pull requests, report bugs, and suggest new features.
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+**See the Proof Docs:**
+- [GUARANTEES.md](GUARANTEES.md) (property → mechanism → proof/tests)
+- [THREAT_MODEL.md](THREAT_MODEL.md) (STRIDE + mitigations)
+- [BENCHMARKS.md](BENCHMARKS.md) (token/step governance)
+- [SECURITY.md](SECURITY.md) (disclosure + supported versions)
 
 ---
-<div align="center">
-  <sub>Built with ❤️ by the KiLu Network Team</sub>
-</div>
+
+## Quickstart (10 minutes)
+
+### 0) Prereqs
+Two Android devices (or one device + emulator):
+*   **Hub** (always-on executor)
+*   **Approver** (keys + biometrics)
+*   A running Control Plane (Cloudflare Worker or local dev)
+
+### 1) Control Plane (Cloudflare Worker)
+```bash
+# example
+cd cloud
+npm install
+npx wrangler dev
+```
+
+### 2) Android app
+```bash
+# example (Android Studio)
+./gradlew assembleDebug
+```
+Install on both devices.
+
+### 3) Configure Control Plane URL
+On both Hub and Approver:
+*   Set Control Plane URL (must be https in prod mode)
+*   Verify "Diagnostics" shows the correct API base.
+
+### 4) Pair Approver → Pair Hub
+*   **On Approver:** Register as Approver (creates device identity)
+*   **On Approver:** Devices → "Pair a Hub" (generates QR)
+*   **On Hub:** Scan QR → Confirm & Connect
+
+### 5) Run a demo episode
+*   Create a simple read-only extraction task
+*   Approve if requested
+*   Hub executes, submits result + evidence hash
+
+---
+
+## Local LLM mode (no paid API keys)
+
+KiLu can run without paid cloud LLMs by using local inference for:
+*   digest compression
+*   draft plan generation (as a proposal)
+*   risk hints / injection flags
+*   approval explanations on Approver
+
+Control Plane remains in Cloudflare (cheap, stable) for:
+*   deterministic policy
+*   capability issuance (JTI/exp/scopes/bindings)
+*   replay protection + audit logs
+
+**Recommended topology**
+*   **Hub:** local LLM (primary)
+*   **Approver:** optional local LLM (approval copilot)
+
+**"Authority" rule**
+Local LLM outputs are advisory. Only these artifacts authorize execution:
+1.  **StepToken** (Control Plane signature)
+2.  **Approval receipt** (Approver signature, if required)
+
+---
+
+## Token efficiency (why KiLu is cheaper to operate)
+
+Most agent stacks burn tokens due to: full-page context flooding (HTML/screenshots), long "think loop" retries, and re-reading unchanged pages.
+
+KiLu reduces cost structurally:
+*   extract-only digest (compact, deterministic)
+*   bounded episodes (budgets + fail-closed)
+*   dedupe + caching (no reprocessing unchanged states)
+*   early escalation (human circuit-breaker)
+
+See [BENCHMARKS.md](BENCHMARKS.md) for reproducible measurements.
+
+---
+
+## Security model (high level)
+
+KiLu is designed for adversarial conditions: prompt injection, malicious webpage content, replay attempts, "evil maid" pairing substitution, and accidental overreach by the LLM.
+
+**Threat model and mitigations:**
+*   [THREAT_MODEL.md](THREAT_MODEL.md)
+*   [SECURITY.md](SECURITY.md)
+
+*NOTE on device keys: current builds may use device-local keys protected at rest (EncryptedSharedPreferences). A planned/optional upgrade path is non-exportable Android Keystore/StrongBox when enabled and verified.*
+
+---
+
+## Repo map
+*   `app/` — Android app (Approver + Hub roles)
+*   `cloud/` — Control Plane (Cloudflare Worker)
+*   `docs/` — architecture, threat model, guarantees, benchmarks
+*   `assets/` — diagrams, screenshots, hero GIF
+
+## Roadmap
+*   **v0.x:** UX polish, strict fail-closed enforcement + tests, reproducible benchmarks
+*   **v1.x:** local LLM provider interface, self-hosted control plane option
+*   **Enterprise:** SIEM hooks, KMS integration, compliance mapping
+
+See [ROADMAP.md](ROADMAP.md).
+
+## Contributing
+We welcome PRs, but we take security seriously. 
+*   Read [CONTRIBUTING.md](CONTRIBUTING.md)
+*   Report vulnerabilities via [SECURITY.md](SECURITY.md)
+
+## License
+Apache-2.0. See [LICENSE](LICENSE).
