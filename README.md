@@ -10,38 +10,63 @@
 [![Platform](https://img.shields.io/badge/Platform-Android%208.0+-green.svg?style=for-the-badge&logo=android)](https://www.android.com/)
 [![License](https://img.shields.io/github/license/IkaRiche/kilu-pocket-agent?style=for-the-badge)](LICENSE)
 
-[Features](#-key-features) • [Architecture](#-architecture) • [Installation](#-installation) • [Dual-Role System](#-dual-role-system) • [Security](#-security-model)
+[Quickstart](#-quickstart-demo) • [Architecture](#-architecture) • [Security & Guarantees](GUARANTEES.md)
 
 </div>
 
 ---
 
-## 💡 Overview
+## 💡 The Vision: Split-Trust Mobile Data Extraction
 
-**KiLu Pocket Agent** turns any Android device into an active node on the KiLu Network. It operates in a unique **Dual-Role System**, allowing a device to act either as a completely secure **Approver** (cryptographically signing operations) or as an autonomous **Hub Runtime** (executing authorized web data extraction tasks).
+**KiLu Pocket Agent** turns any Android device into an active node on the KiLu Network. It operates in a unique **Dual-Role System**, splitting trust between an administrative **Approver** (cryptographically signing operations) and an autonomous **Hub Runtime** (executing authorized web tasks).
 
-Built entirely with native Kotlin and Jetpack Compose, the Pocket Agent delivers blazing-fast performance, deep OS integration, and uncompromising cryptographic security.
+**Three Core Promises:**
+1. 🛡️ **Split-Trust Verification:** Hub workers cannot execute internet tasks without point-in-time cryptographic consent from the Approver.
+2. ⛓️ **Hard Capability Bounds:** Executions are constrained at the network layer to explicitly whitelisted domains and methods.
+3. 📜 **Tamper-Evident Ledgers:** All decisions and extracted data are deterministically signed, enabling verifiable audit trails.
 
-## ✨ Key Features
+> 📺 *[Insert 30-second Demo Video/GIF here showing the Attack → Block → Approve → Evidence flow]*
 
-*   🛡️ **Hardware-Backed Security:** Utilizes AndroidX Security Crypto and the Android Keystore for secure Ed25519 identity generation and plan signing.
-*   🔄 **Dual-Node Architecture:** Instantly switch between an administrative Approver interface and a silent, background Hub worker.
-*   📱 **Native Performance:** Written in 100% Kotlin using the latest Jetpack Compose UI paradigms.
-*   📷 **Rapid Pairing:** Seamless device pairing using Google Play Services ML Kit for instantaneous QR code scanning.
-*   🔒 **Biometric Authentication:** Requires physical biometric verification (fingerprint/face) prior to authorizing any operational bounds.
-*   🌐 **Autonomous Execution:** Hub devices evaluate JS and perform browser operations internally via Android WebView without external dependencies.
+## 🚀 Quickstart: Demo
+
+Want to see the Split-Trust mechanism in action? 
+
+1. **Install the APK** from the [Latest Release](https://github.com/IkaRiche/kilu-pocket-agent/releases/latest).
+2. **Open the Agent** and select the "Approver" role.
+3. **Open the Agent on a second device** (or secondary profile) and select "Hub Worker".
+4. **Scan to Pair:** Scan the Approver's QR code with the Hub device.
+
+*Try triggering an unauthorized extraction task via the Cloud Control Plane API. Watch the Hub escalate the permission request to the Approver for biometric signature.*
 
 ## 🏗️ Architecture
 
-The application is modularly structured to enforce separation of concerns and maintain a "thin client, thick cloud" philosophy.
+```mermaid
+sequenceDiagram
+    participant H as Hub Worker (Android)
+    participant C as Cloud Control Plane
+    participant A as Approver (Android)
 
+    H->>C: Poll Queue (Get Task)
+    C-->>H: Return Task (Untrusted)
+    H->>A: Evaluate Security Assumption (Escalation)
+    Note over A: User reviews boundaries<br/>& Biometric Auth
+    A->>C: Sign & Submit WindowGrant (Ed25519)
+    C->>C: Verify Payload Signature
+    C-->>H: Grant Issued. Execution Authorized.
+```
+
+The application is modularly structured to enforce separation of concerns and maintain a "thin client, thick cloud" philosophy:
 *   **`core/`**: App-wide network utilities (OkHttp), state management, Encrypted Preferences (`DeviceProfileStore`), cryptographic operations, and QR scaffolding.
-*   **`features/`**: Isolated UI domains:
-    *   `onboarding`: Welcome flows and Node Role selection.
-    *   `pairing`: QR Display (Approver) & Scanning (Hub).
-    *   `approver`: Task Inbox, Plan Preview, and Biometric Signing.
-    *   `hub`: Background polling and execution engine.
-*   **`shared/`**: Strongly-typed Data Transfer Objects (DTOs) utilizing `kotlinx.serialization` to strictly mirror Cloud Control Plane JSON schemas.
+*   **`features/`**: Isolated UI domains (Onboarding, Pairing, Approver, Hub).
+*   **`shared/`**: Strongly-typed Data Transfer Objects (DTOs) strictly mirroring Cloud Control Plane JSON schemas.
+
+### 🔐 Security Posture
+
+*   **Identities at Rest:** Currently leverages AndroidX Security Crypto (`EncryptedSharedPreferences`) mapped to AES-256-GCM. 
+*   **Roadmap (v1.0):** Transitioning Ed25519 key generation strictly into the Android Hardware-Backed Keystore (non-exportable Secure Enclave keys).
+*   **Network:** All interactions require dynamic execution tokens granted per-task and revoked upon completion. No persistent API tokens are stored on the Hub.
+
+See [GUARANTEES.md](GUARANTEES.md) and [THREAT_MODEL.md](THREAT_MODEL.md) for full architectural proof schemas.
 
 ## 🎭 Dual-Role System
 
