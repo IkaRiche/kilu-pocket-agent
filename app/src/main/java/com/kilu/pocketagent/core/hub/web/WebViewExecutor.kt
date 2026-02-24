@@ -76,8 +76,8 @@ class WebViewExecutor(private val context: Context) {
             webView?.webViewClient = object : WebViewClient() {
                 override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                     super.onPageStarted(view, url, favicon)
-                    val lowerUrl = url?.toLowerCase() ?: ""
-                    if (url.contains("login") || url.contains("auth")) {
+                    val lowerUrl = url?.lowercase() ?: ""
+                    if (lowerUrl.contains("login") || lowerUrl.contains("auth")) {
                         currentHttpError = "URL redirect suggests Auth: $url"
                     }
                 }

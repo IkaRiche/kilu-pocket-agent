@@ -2,6 +2,11 @@
 
 All notable changes to KiLu Pocket Agent.
 
+## [0.8.2] — 2026-02-24
+
+### Fixed
+- **Build Failure CI**: Resolved a Kotlin compiler error (`Nullable receiver of type String?`) in `WebViewExecutor` that broke the `v0.8.1` pipeline.
+
 ## [0.8.1] — 2026-02-24
 
 ### Fixed
