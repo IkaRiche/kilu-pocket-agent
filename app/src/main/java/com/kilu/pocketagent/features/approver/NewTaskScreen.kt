@@ -30,7 +30,7 @@ fun NewTaskScreen(apiClient: ApiClient, onCreated: (String) -> Unit, onCancel: (
     var errorMsg by remember { mutableStateOf<String?>(null) }
     
     val scope = rememberCoroutineScope()
-    val jsonParser = Json { ignoreUnknownKeys = true }
+    val jsonParser = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     Scaffold(
         topBar = {
