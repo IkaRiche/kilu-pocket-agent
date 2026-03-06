@@ -12,6 +12,7 @@ import androidx.fragment.app.FragmentActivity
 import com.kilu.pocketagent.core.crypto.BiometricGate
 import com.kilu.pocketagent.core.crypto.KeyManager
 import com.kilu.pocketagent.core.network.ApiClient
+import com.kilu.pocketagent.core.storage.DeviceProfileStore
 import com.kilu.pocketagent.core.storage.Role
 import com.kilu.pocketagent.shared.models.ApprovePlanReq
 import com.kilu.pocketagent.shared.models.PlanPreviewResp
@@ -40,6 +41,7 @@ fun PlanPreviewScreen(
     val scope = rememberCoroutineScope()
     val jsonParser = Json { ignoreUnknownKeys = true }
     val keyManager = remember { KeyManager(context) }
+    val deviceStore = remember { DeviceProfileStore(context) }
     val scrollState = rememberScrollState()
 
     LaunchedEffect(taskId) {
@@ -154,8 +156,11 @@ fun PlanPreviewScreen(
                                 val messageBytes = ("receipt:" + planData!!.plan_id).toByteArray()
                                 val signatureB64 = keyManager.sign(Role.APPROVER, messageBytes)
                                 val pubkeyB64 = keyManager.publicKey(Role.APPROVER)
+                                val deviceId = deviceStore.getDeviceId() ?: ""
                                 
                                 val approvePayload = ApprovePlanReq(
+                                    device_id = deviceId,
+                                    biometric_present = true,
                                     pubkey_b64 = pubkeyB64,
                                     signature_b64 = signatureB64
                                 )

@@ -1,17 +1,20 @@
 package com.kilu.pocketagent.features.approver
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.kilu.pocketagent.core.network.ApiClient
@@ -43,6 +46,7 @@ fun ApproverTasksHomeScreen(
     var quotas by remember { mutableStateOf<QuotasResp?>(null) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
+    var taskToDelete by remember { mutableStateOf<ApproverTaskItem?>(null) }
     
     val scope = rememberCoroutineScope()
     val jsonParser = Json { ignoreUnknownKeys = true }
@@ -59,14 +63,14 @@ fun ApproverTasksHomeScreen(
         }
     }
 
-    val loadTasks = {
+    val loadTasks: () -> Unit = {
         scope.launch {
             isLoading = true
             errorMsg = null
             loadQuotas()
             try {
                 val req = Request.Builder()
-                    .url(apiClient.apiUrl("tasks?limit=10"))
+                    .url(apiClient.apiUrl("tasks?limit=20"))
                     .get()
                     .build()
                 val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }
@@ -86,7 +90,42 @@ fun ApproverTasksHomeScreen(
         }
     }
 
+    val cancelTask: (String) -> Unit = { taskId ->
+        scope.launch {
+            try {
+                val body = """{"reason":"Cancelled by user"}"""
+                val req = Request.Builder()
+                    .url(apiClient.apiUrl("tasks/$taskId/cancel"))
+                    .post(body.toRequestBody("application/json".toMediaType()))
+                    .build()
+                withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }
+                // Refresh list regardless of result (task might be in non-cancellable state)
+                loadTasks()
+            } catch (e: Exception) {
+                errorMsg = "Cancel failed: ${e.message}"
+            }
+        }
+    }
+
     LaunchedEffect(Unit) { loadTasks() }
+
+    // Delete confirmation dialog
+    taskToDelete?.let { task ->
+        AlertDialog(
+            onDismissRequest = { taskToDelete = null },
+            title = { Text("Cancel Task?") },
+            text = { Text("Cancel task \"${task.title ?: task.task_id.take(8)}\"? This cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    cancelTask(task.task_id)
+                    taskToDelete = null
+                }) { Text("Cancel Task", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { taskToDelete = null }) { Text("Keep") }
+            }
+        )
+    }
 
     // Count stats
     val activeCount = tasks.count { it.status in listOf("READY_FOR_EXECUTION", "EXECUTING") }
@@ -113,6 +152,11 @@ fun ApproverTasksHomeScreen(
                     containerColor = MaterialTheme.colorScheme.background
                 )
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = onNewTaskClick) {
+                Icon(Icons.Filled.Add, contentDescription = "New Task")
+            }
         }
     ) { padding ->
         Column(
@@ -129,58 +173,29 @@ fun ApproverTasksHomeScreen(
                         .padding(vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    StatCard(
-                        label = "Active",
-                        value = "$activeCount",
-                        color = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier.weight(1f)
-                    )
-                    StatCard(
-                        label = "Pending",
-                        value = "$pendingCount",
-                        color = com.kilu.pocketagent.core.ui.theme.StatusPending,
-                        modifier = Modifier.weight(1f)
-                    )
-                    StatCard(
-                        label = "Done",
-                        value = "$doneCount",
-                        color = com.kilu.pocketagent.core.ui.theme.StatusApproved,
-                        modifier = Modifier.weight(1f)
-                    )
-                    StatCard(
-                        label = "Credits",
-                        value = "${q.planner_credits}",
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.weight(1f)
-                    )
+                    StatCard("Active", "$activeCount", MaterialTheme.colorScheme.tertiary, Modifier.weight(1f))
+                    StatCard("Pending", "$pendingCount", com.kilu.pocketagent.core.ui.theme.StatusPending, Modifier.weight(1f))
+                    StatCard("Done", "$doneCount", com.kilu.pocketagent.core.ui.theme.StatusApproved, Modifier.weight(1f))
+                    StatCard("Credits", "${q.planner_credits}", MaterialTheme.colorScheme.primary, Modifier.weight(1f))
                 }
             }
 
             // ── Quick Actions ──
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            OutlinedButton(
+                onClick = onPairHub,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                shape = MaterialTheme.shapes.small
             ) {
-                OutlinedButton(
-                    onClick = onPairHub,
-                    modifier = Modifier.weight(1f),
-                    shape = MaterialTheme.shapes.small
-                ) {
-                    Text("Pair Hub")
-                }
+                Text("Pair Hub")
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             // ── Error ──
             if (errorMsg != null) {
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer
-                    )
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
                 ) {
                     Text(
                         text = errorMsg ?: "",
@@ -191,12 +206,9 @@ fun ApproverTasksHomeScreen(
                 }
             }
 
-            // ── Task List ──
+            // ── Task List with swipe-to-delete ──
             if (isLoading) {
-                Box(
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
+                Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             } else {
@@ -204,13 +216,6 @@ fun ApproverTasksHomeScreen(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(tasks) { task ->
-                        TaskCard(
-                            task = task,
-                            onClick = { onTaskClick(task.task_id, task.status) }
-                        )
-                    }
-
                     if (tasks.isEmpty()) {
                         item {
                             EmptyState(
@@ -218,6 +223,41 @@ fun ApproverTasksHomeScreen(
                                 title = "No tasks yet",
                                 subtitle = "Tap + to create your first task"
                             )
+                        }
+                    } else {
+                        items(tasks, key = { it.task_id }) { task ->
+                            val dismissState = rememberSwipeToDismissBoxState(
+                                confirmValueChange = { value ->
+                                    if (value == SwipeToDismissBoxValue.EndToStart) {
+                                        taskToDelete = task
+                                    }
+                                    false // Don't auto-dismiss; show dialog first
+                                }
+                            )
+                            SwipeToDismissBox(
+                                state = dismissState,
+                                enableDismissFromStartToEnd = false,
+                                backgroundContent = {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(MaterialTheme.colorScheme.errorContainer)
+                                            .padding(end = 20.dp),
+                                        contentAlignment = Alignment.CenterEnd
+                                    ) {
+                                        Icon(
+                                            Icons.Filled.Delete,
+                                            contentDescription = "Cancel",
+                                            tint = MaterialTheme.colorScheme.error
+                                        )
+                                    }
+                                }
+                            ) {
+                                TaskCard(
+                                    task = task,
+                                    onClick = { onTaskClick(task.task_id, task.status) }
+                                )
+                            }
                         }
                     }
                 }

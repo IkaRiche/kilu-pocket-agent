@@ -2,6 +2,13 @@
 
 All notable changes to KiLu Pocket Agent.
 
+## [0.8.4] — 2026-03-06
+
+### Fixed
+- **ERR_SCHEMA_VALIDATION on Approve**: `ApprovePlanReq` was missing required `device_id` and `biometric_present` fields. Now passed correctly from `DeviceProfileStore`.
+- **Task List - Swipe to Delete**: Tasks can now be cancelled by swiping left — shows a confirmation dialog before sending `POST /tasks/:id/cancel`.
+- **UI Layout**: Buttons no longer cut off on PlanPreview and Diagnostics screens.
+
 ## [0.8.3] — 2026-03-06
 
 ### Fixed
