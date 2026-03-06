@@ -64,7 +64,7 @@ data class TaskReportResp(
 
 @Serializable
 data class ApprovalReceipt(
-    val pubkey_alg: String = "ED25519",
+    val pubkey_alg: String,
     val pubkey_b64: String,
     val signature_b64: String
 )
@@ -72,7 +72,7 @@ data class ApprovalReceipt(
 @Serializable
 data class ApprovePlanReq(
     val device_id: String,
-    val biometric_present: Boolean = true,
+    val biometric_present: Boolean,
     val approval_receipt: ApprovalReceipt
 )
 

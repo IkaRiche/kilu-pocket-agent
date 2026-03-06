@@ -39,7 +39,10 @@ fun PlanPreviewScreen(
     var isApproving by remember { mutableStateOf(false) }
     
     val scope = rememberCoroutineScope()
-    val jsonParser = Json { ignoreUnknownKeys = true }
+    val jsonParser = Json { 
+        ignoreUnknownKeys = true
+        encodeDefaults = true 
+    }
     val keyManager = remember { KeyManager(context) }
     val deviceStore = remember { DeviceProfileStore(context) }
     val scrollState = rememberScrollState()
@@ -157,11 +160,16 @@ fun PlanPreviewScreen(
                                 val signatureB64 = keyManager.sign(Role.APPROVER, messageBytes)
                                 val pubkeyB64 = keyManager.publicKey(Role.APPROVER)
                                 val deviceId = deviceStore.getDeviceId() ?: ""
+                                if (deviceId.isBlank()) {
+                                    errorMsg = "Missing device_id. Re-pair this Approver device."
+                                    return@launch
+                                }
                                 
                                 val approvePayload = ApprovePlanReq(
                                     device_id = deviceId,
                                     biometric_present = true,
                                     approval_receipt = com.kilu.pocketagent.shared.models.ApprovalReceipt(
+                                        pubkey_alg = "ED25519",
                                         pubkey_b64 = pubkeyB64,
                                         signature_b64 = signatureB64
                                     )

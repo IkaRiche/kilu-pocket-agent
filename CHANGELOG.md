@@ -2,6 +2,12 @@
 
 All notable changes to KiLu Pocket Agent.
 
+## [0.8.6] — 2026-03-06
+
+### Fixed
+- **ApprovePlanReq Schema Sync**: `kotlinx.serialization` with `encodeDefaults = false` was stripping `biometric_present` and `pubkey_alg` fields because they had default values. Removed default values from `ApprovalReceipt`/`ApprovePlanReq` and explicitly enabled `encodeDefaults = true` so the payload exactly matches the JSON schema required by the cloud API.
+- **Empty device_id check**: Added explicit validation to block approval and show an error if `device_id` is missing.
+
 ## [0.8.5] — 2026-03-06
 
 ### Fixed
