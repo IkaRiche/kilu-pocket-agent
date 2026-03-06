@@ -1,6 +1,7 @@
 package com.kilu.pocketagent
 
 import com.kilu.pocketagent.core.network.ControlPlaneApi
+import com.kilu.pocketagent.core.utils.PrintLogger
 import com.kilu.pocketagent.shared.models.*
 import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
@@ -34,7 +35,8 @@ class MalformedResponseTest {
         server.start()
         api = ControlPlaneApi(
             client = OkHttpClient(),
-            baseUrl = server.url("/v1").toString().trimEnd('/')
+            baseUrl = server.url("/v1").toString().trimEnd('/'),
+            logger = PrintLogger
         )
     }
 

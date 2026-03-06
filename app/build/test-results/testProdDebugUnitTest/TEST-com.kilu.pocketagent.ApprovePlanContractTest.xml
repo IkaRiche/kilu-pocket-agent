@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.kilu.pocketagent.ApprovePlanContractTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-03-06T21:46:55" hostname="ika-ThinkPad-T460" time="2.706">
+  <properties/>
+  <testcase name="approvePlan request body contains all required fields" classname="com.kilu.pocketagent.ApprovePlanContractTest" time="2.531"/>
+  <testcase name="approvePlan triggers auth failure on 401" classname="com.kilu.pocketagent.ApprovePlanContractTest" time="0.053"/>
+  <testcase name="approvePlan sends correct HTTP method and path" classname="com.kilu.pocketagent.ApprovePlanContractTest" time="0.036"/>
+  <testcase name="approvePlan returns grant on 200" classname="com.kilu.pocketagent.ApprovePlanContractTest" time="0.016"/>
+  <testcase name="approvePlan returns null on 500" classname="com.kilu.pocketagent.ApprovePlanContractTest" time="0.039"/>
+  <testcase name="approvePlan returns null on 400 schema validation error" classname="com.kilu.pocketagent.ApprovePlanContractTest" time="0.028"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[[ControlPlaneApi] E: approvePlan auth error 401
+[ControlPlaneApi] E: approvePlan http=500 body=Internal Error
+[ControlPlaneApi] E: approvePlan http=400 body={"code":"ERR_SCHEMA_VALIDATION","message":"Payload failed schema validation"}
+]]></system-err>
+</testsuite>

@@ -1,0 +1,20 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.kilu.pocketagent.app-mergeProdDebugResources-58:/values-watch-v20/values-watch-v20.xml",
+            "map": [
+                {
+                    "source": "/home/ika/.gradle/caches/transforms-3/22a55d868fd88ac87f053e112f36ebc5/transformed/appcompat-1.2.0/res/values-watch-v20/values-watch-v20.xml",
+                    "from": {
+                        "startLines": "2,5,8",
+                        "startColumns": "4,4,4",
+                        "startOffsets": "55,214,385",
+                        "endLines": "4,7,10",
+                        "endColumns": "12,12,12",
+                        "endOffsets": "209,380,553"
+                    }
+                }
+            ]
+        }
+    ]
+}

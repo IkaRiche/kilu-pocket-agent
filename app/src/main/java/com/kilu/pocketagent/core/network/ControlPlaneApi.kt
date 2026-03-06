@@ -1,6 +1,7 @@
 package com.kilu.pocketagent.core.network
 
-import android.util.Log
+import com.kilu.pocketagent.core.utils.AppLogger
+import com.kilu.pocketagent.core.utils.AndroidLogger
 import com.kilu.pocketagent.shared.models.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -27,6 +28,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 class ControlPlaneApi(
     val client: OkHttpClient,
     val baseUrl: String,
+    private val logger: AppLogger = AndroidLogger,
     private val onAuthFailure: (() -> Unit)? = null
 ) {
     private val json = Json {
@@ -50,21 +52,21 @@ class ControlPlaneApi(
                     resp.isSuccessful -> {
                         val body = resp.body?.string() ?: ""
                         val wrapper = json.decodeFromString<HubQueueListResponse>(body)
-                        Log.d("ControlPlaneApi", "pollQueue ok items=${wrapper.items.size}")
+                        logger.d("ControlPlaneApi", "pollQueue ok items=${wrapper.items.size}")
                         wrapper.items
                     }
                     resp.code == 401 || resp.code == 403 -> {
-                        Log.e("ControlPlaneApi", "pollQueue auth error ${resp.code}")
+                        logger.e("ControlPlaneApi", "pollQueue auth error ${resp.code}")
                         onAuthFailure?.invoke()
                         emptyList()
                     }
                     else -> {
-                        Log.e("ControlPlaneApi", "pollQueue http=${resp.code}")
+                        logger.e("ControlPlaneApi", "pollQueue http=${resp.code}")
                         emptyList()
                     }
                 }
             } catch (e: Exception) {
-                Log.e("ControlPlaneApi", "pollQueue parse/fetch error", e)
+                logger.e("ControlPlaneApi", "pollQueue parse/fetch error", e)
                 emptyList()
             }
         }
@@ -86,17 +88,17 @@ class ControlPlaneApi(
                         json.decodeFromString<ApprovePlanResp>(respBody)
                     }
                     resp.code == 401 || resp.code == 403 -> {
-                        Log.e("ControlPlaneApi", "approvePlan auth error ${resp.code}")
+                        logger.e("ControlPlaneApi", "approvePlan auth error ${resp.code}")
                         onAuthFailure?.invoke()
                         null
                     }
                     else -> {
-                        Log.e("ControlPlaneApi", "approvePlan http=${resp.code} body=${resp.body?.string()}")
+                        logger.e("ControlPlaneApi", "approvePlan http=${resp.code} body=${resp.body?.string()}")
                         null
                     }
                 }
             } catch (e: Exception) {
-                Log.e("ControlPlaneApi", "approvePlan error", e)
+                logger.e("ControlPlaneApi", "approvePlan error", e)
                 null
             }
         }
@@ -123,21 +125,21 @@ class ControlPlaneApi(
                         json.decodeFromString<MintStepBatchResp>(respBody)
                     }
                     resp.code == 401 || resp.code == 403 -> {
-                        Log.e("ControlPlaneApi", "mintStepBatch auth error ${resp.code}")
+                        logger.e("ControlPlaneApi", "mintStepBatch auth error ${resp.code}")
                         onAuthFailure?.invoke()
                         null
                     }
                     resp.code == 429 -> {
-                        Log.e("ControlPlaneApi", "mintStepBatch quota exceeded")
+                        logger.e("ControlPlaneApi", "mintStepBatch quota exceeded")
                         null
                     }
                     else -> {
-                        Log.e("ControlPlaneApi", "mintStepBatch http=${resp.code}")
+                        logger.e("ControlPlaneApi", "mintStepBatch http=${resp.code}")
                         null
                     }
                 }
             } catch (e: Exception) {
-                Log.e("ControlPlaneApi", "mintStepBatch error", e)
+                logger.e("ControlPlaneApi", "mintStepBatch error", e)
                 null
             }
         }
@@ -156,21 +158,21 @@ class ControlPlaneApi(
                     .post(body)
                     .build()
                 val resp = client.newCall(httpReq).execute()
-                Log.d("ControlPlaneApi", "submitResult HTTP=${resp.code} task=$taskId")
+                logger.d("ControlPlaneApi", "submitResult HTTP=${resp.code} task=$taskId")
                 when {
                     resp.isSuccessful || resp.code == 409 -> true
                     resp.code == 401 || resp.code == 403 -> {
-                        Log.e("ControlPlaneApi", "submitResult auth error ${resp.code}")
+                        logger.e("ControlPlaneApi", "submitResult auth error ${resp.code}")
                         onAuthFailure?.invoke()
                         false
                     }
                     else -> {
-                        Log.e("ControlPlaneApi", "submitResult http=${resp.code}")
+                        logger.e("ControlPlaneApi", "submitResult http=${resp.code}")
                         false
                     }
                 }
             } catch (e: Exception) {
-                Log.e("ControlPlaneApi", "submitResult error", e)
+                logger.e("ControlPlaneApi", "submitResult error", e)
                 false
             }
         }
