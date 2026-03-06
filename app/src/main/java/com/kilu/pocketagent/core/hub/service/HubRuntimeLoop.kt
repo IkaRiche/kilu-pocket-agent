@@ -71,6 +71,7 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
 
                 transition(BackoffState.IDLE, "Polling Queue")
                 val tasks = pollQueue()
+                Log.d("HubRuntimeLoop", "Queue size=${tasks.size}")
                 
                 if (tasks.isEmpty()) {
                     transition(BackoffState.IDLE, "Queue empty")
@@ -99,8 +100,9 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
 
     private suspend fun executeTask(task: HubQueueResponse, isActive: () -> Boolean) = coroutineScope {
         wakelockGuard.acquire(120_000)
-        currentState = BackoffState.IDLE // Visual RUNNING state logic
+        currentState = BackoffState.IDLE
         transition(BackoffState.IDLE, "Running task ${task.task_id.take(8)}")
+        Log.d("HubRuntimeLoop", "Executing task=${task.task_id} url=${task.external_url}")
         runHistory.add(System.currentTimeMillis())
         
         var heartbeatJob: Job? = null
@@ -193,6 +195,7 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
                 .build()
                 
             val pubResp = withContext(Dispatchers.IO) { apiClient.client.newCall(pubReq).execute() }
+            Log.d("HubRuntimeLoop", "Result submit HTTP=${pubResp.code} task=${task.task_id}")
             if (pubResp.isSuccessful || pubResp.code == 409) {
                 transition(BackoffState.IDLE, "Success on task ${task.task_id.take(8)}")
                 backoffPolicy.reset()
@@ -239,15 +242,20 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
                     .build()
                 val resp = apiClient.client.newCall(req).execute()
                 if (resp.isSuccessful) {
-                    val bodyStr = resp.body?.string() ?: "[]"
-                    jsonParser.decodeFromString<List<HubQueueResponse>>(bodyStr)
+                    val bodyStr = resp.body?.string() ?: """"""
+                    val wrapper = jsonParser.decodeFromString<HubQueueListResponse>(bodyStr)
+                    Log.d("HubRuntimeLoop", "hub/queue ok, items=${wrapper.items.size}")
+                    wrapper.items
                 } else if (resp.code == 401 || resp.code == 403) {
-                    apiClient.store.clearSessionToken() // Force Error Auth
+                    Log.e("HubRuntimeLoop", "hub/queue auth error ${resp.code}")
+                    apiClient.store.clearSessionToken()
                     emptyList()
                 } else {
+                    Log.e("HubRuntimeLoop", "hub/queue http=${resp.code}")
                     emptyList()
                 }
             } catch (e: Exception) {
+                Log.e("HubRuntimeLoop", "hub/queue parse/fetch error", e)
                 emptyList()
             }
         }

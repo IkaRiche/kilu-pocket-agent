@@ -2,6 +2,12 @@
 
 All notable changes to KiLu Pocket Agent.
 
+## [0.8.7] — 2026-03-06
+
+### Fixed
+- **Hub Queue Parsing (Critical)**: `HubRuntimeLoop.pollQueue()` was incorrectly parsing the server response as a bare `List<HubQueueResponse>` while the server sends `{ "items": [...] }`. Every poll silently failed and returned `emptyList()`, making the Hub loop permanently blind — it never saw approved tasks. Fixed to use `HubQueueListResponse` wrapper (same as `HubDashboardScreen`).
+- **Debug Logging**: Added `Log.d/e("HubRuntimeLoop", ...)` at poll, execute start, and result submit to aid future diagnosis.
+
 ## [0.8.6] — 2026-03-06
 
 ### Fixed
