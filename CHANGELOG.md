@@ -2,6 +2,13 @@
 
 All notable changes to KiLu Pocket Agent.
 
+## [0.8.3] — 2026-03-06
+
+### Fixed
+- **Biometric Prompt**: `MainActivity` changed to `FragmentActivity` — biometric prompt now works correctly when approving plans.
+- **UI Layout**: `PlanPreviewScreen` — plan steps now scroll vertically; Approve button is always visible at the bottom regardless of content length.
+- **Protocol Idempotency**: `POST /v1/tasks/:id/plan` no longer returns `ERR_INVALID_STATE` when task is already in `NEEDS_PLAN_APPROVAL` state — returns existing plan instead.
+
 ## [0.8.2] — 2026-02-24
 
 ### Fixed
