@@ -161,8 +161,10 @@ fun PlanPreviewScreen(
                                 val approvePayload = ApprovePlanReq(
                                     device_id = deviceId,
                                     biometric_present = true,
-                                    pubkey_b64 = pubkeyB64,
-                                    signature_b64 = signatureB64
+                                    approval_receipt = com.kilu.pocketagent.shared.models.ApprovalReceipt(
+                                        pubkey_b64 = pubkeyB64,
+                                        signature_b64 = signatureB64
+                                    )
                                 )
                                 
                                 val appReq = Request.Builder()

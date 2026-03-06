@@ -2,6 +2,13 @@
 
 All notable changes to KiLu Pocket Agent.
 
+## [0.8.5] — 2026-03-06
+
+### Fixed
+- **ApprovePlanReq Schema Sync**: Server schema strictly requires `approval_receipt` to be a nested object containing the signature elements. `ApprovePlanReq` data class updated to exactly match this structure.
+- **Card UI Bleed**: Fixed red background bleeding on swipe-to-dismiss in `ApproverTasksHomeScreen`.
+- **Text Overflow**: Prevented long device names from pushing status text off-screen in `DevicesScreen`.
+
 ## [0.8.4] — 2026-03-06
 
 ### Fixed

@@ -241,7 +241,10 @@ fun ApproverTasksHomeScreen(
                                     Box(
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .background(MaterialTheme.colorScheme.errorContainer)
+                                            .background(
+                                                MaterialTheme.colorScheme.errorContainer,
+                                                shape = MaterialTheme.shapes.medium
+                                            )
                                             .padding(end = 20.dp),
                                         contentAlignment = Alignment.CenterEnd
                                     ) {

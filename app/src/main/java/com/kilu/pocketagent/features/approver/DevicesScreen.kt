@@ -216,10 +216,12 @@ private fun DeviceCard(device: DeviceInfo, isCurrentDevice: Boolean, onCopyId: (
                         style = MaterialTheme.typography.titleLarge
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             device.display_name,
-                            style = MaterialTheme.typography.titleMedium
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                         )
                         Text(
                             device.device_type + if (isCurrentDevice) " (this device)" else "",
@@ -228,6 +230,7 @@ private fun DeviceCard(device: DeviceInfo, isCurrentDevice: Boolean, onCopyId: (
                         )
                     }
                 }
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     when (device.status) {
                         "ONLINE" -> "Online ✓"
