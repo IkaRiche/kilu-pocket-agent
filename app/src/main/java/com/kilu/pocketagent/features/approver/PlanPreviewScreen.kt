@@ -1,6 +1,8 @@
 package com.kilu.pocketagent.features.approver
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -38,6 +40,7 @@ fun PlanPreviewScreen(
     val scope = rememberCoroutineScope()
     val jsonParser = Json { ignoreUnknownKeys = true }
     val keyManager = remember { KeyManager(context) }
+    val scrollState = rememberScrollState()
 
     LaunchedEffect(taskId) {
         try {
@@ -57,56 +60,69 @@ fun PlanPreviewScreen(
         }
     }
 
+    // Outer column: full height, does NOT scroll
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+
         Text("Execution Plan", style = MaterialTheme.typography.headlineMedium)
         Spacer(modifier = Modifier.height(16.dp))
         
-        if (planData != null) {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Plan ID: ${planData!!.plan_id.take(8)}...")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    planData!!.summary?.let {
-                        Text("AI Summary:", style = MaterialTheme.typography.labelLarge)
-                        Text(it, style = MaterialTheme.typography.bodyMedium)
+        // Scrollable content area with weight so it doesn't push the buttons off-screen
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(scrollState)
+        ) {
+            if (planData != null) {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Plan ID: ${planData!!.plan_id.take(8)}...")
                         Spacer(modifier = Modifier.height(8.dp))
-                    }
+                        
+                        planData!!.summary?.let {
+                            Text("AI Summary:", style = MaterialTheme.typography.labelLarge)
+                            Text(it, style = MaterialTheme.typography.bodyMedium)
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
 
-                    Text("Allowed Domains: ${planData!!.allowlist_domains.joinToString()}")
-                    Text("Max Steps: ${planData!!.max_steps}")
-                    Text("Expires At: ${planData!!.expires_at}")
-                    
-                    planData!!.steps_preview?.let { steps ->
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text("Steps Preview:", style = MaterialTheme.typography.labelLarge)
-                        steps.forEach { step ->
-                            Text("• ${step.op}: ${step.desc}", style = MaterialTheme.typography.bodySmall)
+                        Text("Allowed Domains: ${planData!!.allowlist_domains.joinToString()}")
+                        Text("Max Steps: ${planData!!.max_steps}")
+                        Text("Expires At: ${planData!!.expires_at}")
+                        
+                        planData!!.steps_preview?.let { steps ->
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text("Steps Preview:", style = MaterialTheme.typography.labelLarge)
+                            steps.forEach { step ->
+                                Text("• ${step.op}: ${step.desc}", style = MaterialTheme.typography.bodySmall)
+                            }
                         }
                     }
                 }
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("One approval enables autonomous execution within limits (domain, steps, time).", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
-            
-        } else if (errorMsg != null) {
-            Text("Error: $errorMsg", color = MaterialTheme.colorScheme.error)
-        } else {
-            CircularProgressIndicator()
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("AI is analyzing bonds...")
-        }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    "One approval enables autonomous execution within limits (domain, steps, time).",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
 
-        Spacer(modifier = Modifier.weight(1f))
-        
-        if (errorMsg != null) {
-            if (errorMsg != null) {
+            } else if (errorMsg != null) {
+                Text("Error: $errorMsg", color = MaterialTheme.colorScheme.error)
+            } else {
+                CircularProgressIndicator()
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("Status: $errorMsg", color = MaterialTheme.colorScheme.error)
+                Text("Fetching plan...")
             }
         }
 
+        // Status message always visible above buttons
+        if (errorMsg != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Status: $errorMsg", color = MaterialTheme.colorScheme.error)
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Buttons ALWAYS at the bottom, never scrolled off-screen
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             TextButton(onClick = onBack, enabled = !isApproving) {
                 Text("Back")
@@ -135,8 +151,7 @@ fun PlanPreviewScreen(
                                     return@launch
                                 }
                                 
-                                // Sign the "approval_receipt"
-                                val messageBytes = ("receipt:" + planData!!.plan_id).toByteArray() // Strict signature schema requirement
+                                val messageBytes = ("receipt:" + planData!!.plan_id).toByteArray()
                                 val signatureB64 = keyManager.sign(Role.APPROVER, messageBytes)
                                 val pubkeyB64 = keyManager.publicKey(Role.APPROVER)
                                 
