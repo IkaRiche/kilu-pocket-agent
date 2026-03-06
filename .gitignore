@@ -12,3 +12,5 @@ local.properties
 *.keystore
 pass.txt
 *.key
+jdk-17.0.2/
+.tmp/
