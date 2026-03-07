@@ -23,7 +23,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import okhttp3.Request
+import com.kilu.pocketagent.core.network.ControlPlaneApi
 
 @Serializable
 data class DeviceInfo(
@@ -47,7 +47,6 @@ fun DevicesScreen(
     val clipboardManager = LocalClipboardManager.current
     val isPaired = store.getSessionToken() != null
     val scope = rememberCoroutineScope()
-    val jsonParser = Json { ignoreUnknownKeys = true }
 
     var devices by remember { mutableStateOf<List<DeviceInfo>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
@@ -59,16 +58,12 @@ fun DevicesScreen(
             isLoading = true
             errorMsg = null
             try {
-                val req = Request.Builder()
-                    .url(apiClient.apiUrl("devices"))
-                    .get()
-                    .build()
-                val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }
-                if (resp.isSuccessful) {
-                    val body = resp.body?.string() ?: "[]"
-                    devices = jsonParser.decodeFromString<List<DeviceInfo>>(body)
+                val controlPlane = ControlPlaneApi(apiClient.client, apiClient.apiUrl(""))
+                val result = controlPlane.getDevices()
+                if (result != null) {
+                    devices = result
                 } else {
-                    errorMsg = "Error: ${resp.code}"
+                    errorMsg = "Failed to load devices."
                 }
             } catch (e: Exception) {
                 errorMsg = e.message

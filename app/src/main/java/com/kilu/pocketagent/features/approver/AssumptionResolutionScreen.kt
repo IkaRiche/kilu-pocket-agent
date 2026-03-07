@@ -14,11 +14,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
+import com.kilu.pocketagent.core.network.ControlPlaneApi
 
 @Serializable
 data class ResolutionItemReq(val key: String, val resolution: String)
@@ -41,7 +38,6 @@ fun AssumptionResolutionScreen(
     // Since our Hub just submits `page_load_failed` or `security_heuristic`, we'll display a generic form.
     var resolutionText by remember { mutableStateOf("Bypass warning and retry extraction.") }
     val scope = rememberCoroutineScope()
-    val jsonParser = Json { ignoreUnknownKeys = true }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("Resolve Escalation", style = MaterialTheme.typography.headlineMedium)
@@ -104,17 +100,14 @@ fun AssumptionResolutionScreen(
                                     ResolutionItemReq(key = "page_load_failed", resolution = resolutionText)
                                 )
                             )
-                            val req = Request.Builder()
-                                .url(apiClient.apiUrl("tasks/$taskId/assumptions/resolve"))
-                                .post(jsonParser.encodeToString(payload).toByteArray().toRequestBody("application/json".toMediaType()))
-                                .build()
-                            val resp = apiClient.client.newCall(req).execute()
+                            val controlPlane = ControlPlaneApi(apiClient.client, apiClient.apiUrl(""))
+                            val success = controlPlane.resolveAssumptions(taskId, payload)
                             
                             withContext(Dispatchers.Main) {
-                                if (resp.isSuccessful) {
+                                if (success) {
                                     onResolved()
                                 } else {
-                                    errorMsg = ErrorHandler.parseError(resp)
+                                    errorMsg = "Failed to resolve assumptions."
                                 }
                             }
                         } catch (e: Exception) {

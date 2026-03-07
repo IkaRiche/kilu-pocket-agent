@@ -28,9 +28,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
+import com.kilu.pocketagent.core.network.ControlPlaneApi
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,17 +47,16 @@ fun ApproverTasksHomeScreen(
     var taskToDelete by remember { mutableStateOf<ApproverTaskItem?>(null) }
     
     val scope = rememberCoroutineScope()
-    val jsonParser = Json { ignoreUnknownKeys = true }
+    val controlPlane = remember {
+        ControlPlaneApi(apiClient.client, apiClient.apiUrl("")) {
+            onSessionInvalid()
+        }
+    }
 
     val loadQuotas = {
         scope.launch {
-            try {
-                val req = Request.Builder().url(apiClient.apiUrl("quotas")).get().build()
-                val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }
-                if (resp.isSuccessful) {
-                    quotas = jsonParser.decodeFromString<QuotasResp>(resp.body?.string() ?: "")
-                }
-            } catch (_: Exception) {}
+            val q = controlPlane.getQuotas()
+            if (q != null) quotas = q
         }
     }
 
@@ -68,42 +65,21 @@ fun ApproverTasksHomeScreen(
             isLoading = true
             errorMsg = null
             loadQuotas()
-            try {
-                val req = Request.Builder()
-                    .url(apiClient.apiUrl("tasks?limit=20"))
-                    .get()
-                    .build()
-                val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }
-                if (resp.isSuccessful) {
-                    val body = resp.body?.string() ?: "[]"
-                    tasks = jsonParser.decodeFromString<List<ApproverTaskItem>>(body)
-                } else if (resp.code == 401 || resp.code == 403) {
-                    onSessionInvalid()
-                } else {
-                    errorMsg = ErrorHandler.parseError(resp)
-                }
-            } catch (e: Exception) {
-                errorMsg = e.message
-            } finally {
-                isLoading = false
+            val result = controlPlane.getTasks(20)
+            if (result != null) {
+                tasks = result
+            } else {
+                errorMsg = "Failed to load tasks."
             }
+            isLoading = false
         }
     }
 
     val cancelTask: (String) -> Unit = { taskId ->
         scope.launch {
-            try {
-                val body = """{"reason":"Cancelled by user"}"""
-                val req = Request.Builder()
-                    .url(apiClient.apiUrl("tasks/$taskId/cancel"))
-                    .post(body.toRequestBody("application/json".toMediaType()))
-                    .build()
-                withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }
-                // Refresh list regardless of result (task might be in non-cancellable state)
-                loadTasks()
-            } catch (e: Exception) {
-                errorMsg = "Cancel failed: ${e.message}"
-            }
+            val success = controlPlane.cancelTask(taskId)
+            if (!success) errorMsg = "Cancel failed."
+            loadTasks()
         }
     }
 

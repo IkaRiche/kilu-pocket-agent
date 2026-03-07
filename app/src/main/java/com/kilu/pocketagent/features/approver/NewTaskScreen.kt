@@ -14,11 +14,8 @@ import com.kilu.pocketagent.shared.utils.ErrorHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
+import com.kilu.pocketagent.core.network.ControlPlaneApi
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,7 +27,6 @@ fun NewTaskScreen(apiClient: ApiClient, onCreated: (String) -> Unit, onCancel: (
     var errorMsg by remember { mutableStateOf<String?>(null) }
     
     val scope = rememberCoroutineScope()
-    val jsonParser = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     Scaffold(
         topBar = {
@@ -144,18 +140,12 @@ fun NewTaskScreen(apiClient: ApiClient, onCreated: (String) -> Unit, onCancel: (
                                 executor_preference = "HUB_PREFERRED",
                                 inputs = inputs
                             )
-                            val req = Request.Builder()
-                                .url(apiClient.apiUrl("tasks"))
-                                .post(jsonParser.encodeToString(reqPayload).toByteArray().toRequestBody("application/json".toMediaType()))
-                                .build()
-                            
-                            val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }
-                            if (resp.isSuccessful) {
-                                val bodyStr = resp.body?.string() ?: ""
-                                val data = jsonParser.decodeFromString<CreateTaskResp>(bodyStr)
+                            val controlPlane = ControlPlaneApi(apiClient.client, apiClient.apiUrl(""))
+                            val data = controlPlane.createTask(reqPayload)
+                            if (data != null) {
                                 onCreated(data.task_id)
                             } else {
-                                errorMsg = ErrorHandler.parseError(resp)
+                                errorMsg = "Failed to create task."
                             }
                         } catch (e: Exception) {
                             errorMsg = "Network Error: ${e.message}"

@@ -2,7 +2,9 @@ package com.kilu.pocketagent.core.network
 
 import com.kilu.pocketagent.core.utils.AppLogger
 import com.kilu.pocketagent.core.utils.AndroidLogger
+import com.kilu.pocketagent.features.approver.ResolveAssumptionsReq
 import com.kilu.pocketagent.shared.models.*
+import com.kilu.pocketagent.features.approver.DeviceInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -175,5 +177,258 @@ class ControlPlaneApi(
                 logger.e("ControlPlaneApi", "submitResult error", e)
                 false
             }
+        }
+    // ── Lease Refresh ──────────────────────────────────────────────────────────
+
+    suspend fun refreshLease(taskId: String): Boolean =
+        withContext(Dispatchers.IO) {
+            try {
+                val body = "{\"task_id\":\"$taskId\"}".toRequestBody(mediaTypeJson)
+                val httpReq = Request.Builder()
+                    .url("$baseUrl/hub/lease/refresh")
+                    .post(body)
+                    .build()
+                val resp = client.newCall(httpReq).execute()
+                when {
+                    resp.isSuccessful -> true
+                    resp.code == 401 || resp.code == 403 -> {
+                        logger.e("ControlPlaneApi", "refreshLease auth error ${resp.code}")
+                        onAuthFailure?.invoke()
+                        false
+                    }
+                    else -> {
+                        logger.e("ControlPlaneApi", "refreshLease http=${resp.code}")
+                        false
+                    }
+                }
+            } catch (e: Exception) {
+                logger.e("ControlPlaneApi", "refreshLease error", e)
+                false
+            }
+        }
+
+    // ── Escalation / Assumptions ───────────────────────────────────────────────
+
+    suspend fun requestAssumptions(taskId: String, req: RequestAssumptionsReq): Boolean =
+        withContext(Dispatchers.IO) {
+            try {
+                val body = json.encodeToString(req).toByteArray().toRequestBody(mediaTypeJson)
+                val httpReq = Request.Builder()
+                    .url("$baseUrl/tasks/$taskId/assumptions/request")
+                    .post(body)
+                    .build()
+                val resp = client.newCall(httpReq).execute()
+                when {
+                    resp.isSuccessful -> true
+                    resp.code == 401 || resp.code == 403 -> {
+                        logger.e("ControlPlaneApi", "requestAssumptions auth error ${resp.code}")
+                        onAuthFailure?.invoke()
+                        false
+                    }
+                    else -> {
+                        logger.e("ControlPlaneApi", "requestAssumptions http=${resp.code}")
+                        false
+                    }
+                }
+            } catch (e: Exception) {
+                logger.e("ControlPlaneApi", "requestAssumptions error", e)
+                false
+            }
+        }
+
+    // ── Approver UI Endpoints ──────────────────────────────────────────────────
+
+    suspend fun getPlan(taskId: String): PlanPreviewResp? =
+        withContext(Dispatchers.IO) {
+            try {
+                val req = Request.Builder()
+                    .url("$baseUrl/tasks/$taskId/plan")
+                    .post("{\"planner_mode\": \"managed\"}".toRequestBody(mediaTypeJson))
+                    .build()
+                val resp = client.newCall(req).execute()
+                when {
+                    resp.isSuccessful -> {
+                        val body = resp.body?.string() ?: ""
+                        json.decodeFromString<PlanPreviewResp>(body)
+                    }
+                    resp.code == 401 || resp.code == 403 -> {
+                        logger.e("ControlPlaneApi", "getPlan auth error ${resp.code}")
+                        onAuthFailure?.invoke()
+                        null
+                    }
+                    else -> {
+                        logger.e("ControlPlaneApi", "getPlan http=${resp.code}")
+                        null
+                    }
+                }
+            } catch (e: Exception) {
+                logger.e("ControlPlaneApi", "getPlan error", e)
+                null
+            }
+        }
+
+    suspend fun createTask(req: CreateTaskReq): CreateTaskResp? =
+        withContext(Dispatchers.IO) {
+            try {
+                val body = json.encodeToString(req).toByteArray().toRequestBody(mediaTypeJson)
+                val httpReq = Request.Builder()
+                    .url("$baseUrl/tasks")
+                    .post(body)
+                    .build()
+                val resp = client.newCall(httpReq).execute()
+                when {
+                    resp.isSuccessful -> {
+                        val respBody = resp.body?.string() ?: ""
+                        json.decodeFromString<CreateTaskResp>(respBody)
+                    }
+                    resp.code == 401 || resp.code == 403 -> {
+                        logger.e("ControlPlaneApi", "createTask auth error ${resp.code}")
+                        onAuthFailure?.invoke()
+                        null
+                    }
+                    else -> {
+                        logger.e("ControlPlaneApi", "createTask http=${resp.code}")
+                        null
+                    }
+                }
+            } catch (e: Exception) {
+                logger.e("ControlPlaneApi", "createTask error", e)
+                null
+            }
+        }
+
+    suspend fun getQuotas(): QuotasResp? =
+        withContext(Dispatchers.IO) {
+            try {
+                val req = Request.Builder().url("$baseUrl/quotas").get().build()
+                val resp = client.newCall(req).execute()
+                when {
+                    resp.isSuccessful -> json.decodeFromString<QuotasResp>(resp.body?.string() ?: "")
+                    resp.code == 401 || resp.code == 403 -> {
+                        onAuthFailure?.invoke()
+                        null
+                    }
+                    else -> null
+                }
+            } catch (e: Exception) { null }
+        }
+
+    suspend fun getTasks(limit: Int = 20): List<ApproverTaskItem>? =
+        withContext(Dispatchers.IO) {
+            try {
+                val req = Request.Builder().url("$baseUrl/tasks?limit=$limit").get().build()
+                val resp = client.newCall(req).execute()
+                when {
+                    resp.isSuccessful -> json.decodeFromString<List<ApproverTaskItem>>(resp.body?.string() ?: "[]")
+                    resp.code == 401 || resp.code == 403 -> {
+                        logger.e("ControlPlaneApi", "getTasks auth error ${resp.code}")
+                        onAuthFailure?.invoke()
+                        null
+                    }
+                    else -> {
+                        logger.e("ControlPlaneApi", "getTasks http=${resp.code}")
+                        null
+                    }
+                }
+            } catch (e: Exception) {
+                logger.e("ControlPlaneApi", "getTasks error", e)
+                null
+            }
+        }
+
+    suspend fun cancelTask(taskId: String): Boolean =
+        withContext(Dispatchers.IO) {
+            try {
+                val body = "{\"reason\":\"Cancelled by user\"}".toRequestBody(mediaTypeJson)
+                val req = Request.Builder().url("$baseUrl/tasks/$taskId/cancel").post(body).build()
+                val resp = client.newCall(req).execute()
+                when {
+                    resp.isSuccessful -> true
+                    resp.code == 401 || resp.code == 403 -> {
+                        onAuthFailure?.invoke()
+                        false
+                    }
+                    else -> false
+                }
+            } catch (e: Exception) { false }
+        }
+
+    suspend fun getInbox(max: Int = 50): InboxResponse? =
+        withContext(Dispatchers.IO) {
+            try {
+                val req = Request.Builder().url("$baseUrl/inbox?max=$max").get().build()
+                val resp = client.newCall(req).execute()
+                when {
+                    resp.isSuccessful -> json.decodeFromString<InboxResponse>(resp.body?.string() ?: "{\"events\":[]}")
+                    resp.code == 401 || resp.code == 403 -> {
+                        onAuthFailure?.invoke()
+                        null
+                    }
+                    else -> null
+                }
+            } catch (e: Exception) { null }
+        }
+
+    suspend fun ackInbox(eventId: String): Boolean =
+        withContext(Dispatchers.IO) {
+            try {
+                val body = "{\"event_id\":\"$eventId\"}".toRequestBody(mediaTypeJson)
+                val req = Request.Builder().url("$baseUrl/inbox/ack").post(body).build()
+                val resp = client.newCall(req).execute()
+                when {
+                    resp.isSuccessful -> true
+                    resp.code == 401 || resp.code == 403 -> {
+                        onAuthFailure?.invoke()
+                        false
+                    }
+                    else -> false
+                }
+            } catch (e: Exception) { false }
+        }
+    suspend fun resolveAssumptions(taskId: String, req: ResolveAssumptionsReq): Boolean =
+        withContext(Dispatchers.IO) {
+            try {
+                val body = json.encodeToString(req).toByteArray().toRequestBody(mediaTypeJson)
+                val httpReq = Request.Builder()
+                    .url("$baseUrl/tasks/$taskId/assumptions/resolve")
+                    .post(body)
+                    .build()
+                val resp = client.newCall(httpReq).execute()
+                when {
+                    resp.isSuccessful -> true
+                    resp.code == 401 || resp.code == 403 -> {
+                        logger.e("ControlPlaneApi", "resolveAssumptions auth error ${resp.code}")
+                        onAuthFailure?.invoke()
+                        false
+                    }
+                    else -> {
+                        logger.e("ControlPlaneApi", "resolveAssumptions http=${resp.code}")
+                        false
+                    }
+                }
+            } catch (e: Exception) {
+                logger.e("ControlPlaneApi", "resolveAssumptions error", e)
+                false
+            }
+        }
+
+    suspend fun getDevices(): List<DeviceInfo>? =
+        withContext(Dispatchers.IO) {
+            try {
+                val req = Request.Builder().url("$baseUrl/devices").get().build()
+                val resp = client.newCall(req).execute()
+                when {
+                    resp.isSuccessful -> {
+                        val body = resp.body?.string() ?: "[]"
+                        json.decodeFromString<List<DeviceInfo>>(body)
+                    }
+                    resp.code == 401 || resp.code == 403 -> {
+                        logger.e("ControlPlaneApi", "getDevices auth error ${resp.code}")
+                        onAuthFailure?.invoke()
+                        null
+                    }
+                    else -> null
+                }
+            } catch (e: Exception) { null }
         }
 }

@@ -20,11 +20,8 @@ import com.kilu.pocketagent.shared.utils.ErrorHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
+import com.kilu.pocketagent.core.network.ControlPlaneApi
 
 @Composable
 fun PlanPreviewScreen(
@@ -39,26 +36,18 @@ fun PlanPreviewScreen(
     var isApproving by remember { mutableStateOf(false) }
     
     val scope = rememberCoroutineScope()
-    val jsonParser = Json { 
-        ignoreUnknownKeys = true
-        encodeDefaults = true 
-    }
     val keyManager = remember { KeyManager(context) }
     val deviceStore = remember { DeviceProfileStore(context) }
     val scrollState = rememberScrollState()
 
     LaunchedEffect(taskId) {
         try {
-            val req = Request.Builder()
-                .url(apiClient.apiUrl("tasks/$taskId/plan"))
-                .post("{\"planner_mode\": \"managed\"}".toRequestBody("application/json".toMediaType()))
-                .build()
-            val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }
-            if (resp.isSuccessful) {
-                val bodyStr = resp.body?.string() ?: ""
-                planData = jsonParser.decodeFromString<PlanPreviewResp>(bodyStr)
+            val controlPlane = ControlPlaneApi(apiClient.client, apiClient.apiUrl(""))
+            val plan = controlPlane.getPlan(taskId)
+            if (plan != null) {
+                planData = plan
             } else {
-                errorMsg = ErrorHandler.parseError(resp)
+                errorMsg = "Failed to fetch plan."
             }
         } catch (e: Exception) {
             errorMsg = "Failed to fetch plan: ${e.message}"
@@ -175,17 +164,13 @@ fun PlanPreviewScreen(
                                     )
                                 )
                                 
-                                val appReq = Request.Builder()
-                                    .url(apiClient.apiUrl("plans/${planData!!.plan_id}/approve"))
-                                    .post(jsonParser.encodeToString(approvePayload).toByteArray().toRequestBody("application/json".toMediaType()))
-                                    .build()
+                                val controlPlane = ControlPlaneApi(apiClient.client, apiClient.apiUrl(""))
+                                val appResp = controlPlane.approvePlan(planData!!.plan_id, approvePayload)
                                 
-                                val appResp = withContext(Dispatchers.IO) { apiClient.client.newCall(appReq).execute() }
-                                
-                                if (appResp.isSuccessful) {
+                                if (appResp != null) {
                                     onApproved()
                                 } else {
-                                    errorMsg = ErrorHandler.parseError(appResp)
+                                    errorMsg = "Approval failed."
                                 }
                                 
                             } catch (e: Exception) {

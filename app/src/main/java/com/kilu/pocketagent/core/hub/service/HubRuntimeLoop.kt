@@ -12,19 +12,20 @@ import com.kilu.pocketagent.core.hub.web.WebViewExecutor
 import com.kilu.pocketagent.core.network.ApiClient
 import com.kilu.pocketagent.shared.models.*
 import kotlinx.coroutines.*
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import com.kilu.pocketagent.core.network.ControlPlaneApi
+import com.kilu.pocketagent.shared.models.*
+import kotlinx.coroutines.*
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 
 class HubRuntimeLoop(private val context: Context, private val apiClient: ApiClient) {
 
     private val backoffPolicy = BackoffPolicy()
-    private val jsonParser = Json { ignoreUnknownKeys = true }
+    private val jsonParser = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
     private val wakelockGuard = WakelockGuard(context)
+    private val controlPlane = ControlPlaneApi(apiClient.client, apiClient.apiUrl("")) {
+        apiClient.store.clearSessionToken()
+    }
     
     // C2: Ensure single-fire guard persists per task_id
     private val assumptionsPrefs = context.getSharedPreferences("kilu_assumptions_cache", Context.MODE_PRIVATE)
@@ -112,30 +113,20 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
             heartbeatJob = launch(Dispatchers.IO) {
                 while (isActive() && wakelockGuard.isHeld()) {
                     delay(30_000)
-                    try {
-                        val req = Request.Builder()
-                            .url(apiClient.apiUrl("hub/lease/refresh"))
-                            .post("{\"task_id\":\"${task.task_id}\"}".toRequestBody("application/json".toMediaType()))
-                            .build()
-                        apiClient.client.newCall(req).execute()
-                    } catch (e: Exception) { }
+                    controlPlane.refreshLease(task.task_id)
                 }
             }
 
             // Mint batch checks
-            val mintReq = Request.Builder()
-                .url(apiClient.apiUrl("grants/${task.grant_id}/mint-step-batch"))
-                .post(jsonParser.encodeToString(MintStepBatchReq(1)).toByteArray().toRequestBody("application/json".toMediaType()))
-                .build()
-                                
-            val mResp = withContext(Dispatchers.IO) { apiClient.client.newCall(mintReq).execute() }
-            if (mResp.code == 403 || mResp.code == 429) {
-                transition(BackoffState.ERROR_QUOTA, "Mint failed (${mResp.code})")
+            if (task.grant_id == null) {
+                transition(BackoffState.ERROR_QUOTA, "No grant_id provided")
                 delay(backoffPolicy.getDelayMs(BackoffState.ERROR_QUOTA))
                 return@coroutineScope
-            } else if (!mResp.isSuccessful) {
-                transition(BackoffState.ERROR_NETWORK, "Mint network err (${mResp.code})")
-                delay(backoffPolicy.getDelayMs(BackoffState.ERROR_NETWORK))
+            }
+            val mintResp = controlPlane.mintStepBatch(task.grant_id, 1)
+            if (mintResp == null) {
+                transition(BackoffState.ERROR_QUOTA, "Mint failed or exhausted")
+                delay(backoffPolicy.getDelayMs(BackoffState.ERROR_QUOTA))
                 return@coroutineScope
             }
 
@@ -189,21 +180,16 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
                 hashes = hashObj
             )
             
-            val pubReq = Request.Builder()
-                .url(apiClient.apiUrl("tasks/${task.task_id}/result"))
-                .post(jsonParser.encodeToString(resPayload).toByteArray().toRequestBody("application/json".toMediaType()))
-                .build()
-                
-            val pubResp = withContext(Dispatchers.IO) { apiClient.client.newCall(pubReq).execute() }
-            Log.d("HubRuntimeLoop", "Result submit HTTP=${pubResp.code} task=${task.task_id}")
-            if (pubResp.isSuccessful || pubResp.code == 409) {
+            val ok = controlPlane.submitResult(task.task_id, resPayload)
+            Log.d("HubRuntimeLoop", "Result submit ok=$ok task=${task.task_id}")
+            if (ok) {
                 transition(BackoffState.IDLE, "Success on task ${task.task_id.take(8)}")
                 backoffPolicy.reset()
                 
                 // C3: Remove cache entry so we don't accidentally block it next time (idempotency prevents dupes server-side anyway)
                 assumptionsPrefs.edit().remove("esc_${task.task_id}").apply()
             } else {
-                transition(BackoffState.ERROR_NETWORK, "Submit Failed (${pubResp.code})")
+                transition(BackoffState.ERROR_NETWORK, "Submit Failed")
                 delay(backoffPolicy.getDelayMs(BackoffState.ERROR_NETWORK))
             }
 
@@ -216,16 +202,10 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
 
     private suspend fun handleEscalation(taskId: String, key: String, reason: String) {
         if (!assumptionsPrefs.getBoolean("esc_$taskId", false)) {
-            try {
-                val payload = RequestAssumptionsReq(
-                    assumptions = listOf(AssumptionItemReq(key, "Execution blocked: $reason"))
-                )
-                val req = Request.Builder()
-                    .url(apiClient.apiUrl("tasks/$taskId/assumptions/request"))
-                    .post(jsonParser.encodeToString(payload).toByteArray().toRequestBody("application/json".toMediaType()))
-                    .build()
-                withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }
-            } catch (e: Exception) { }
+            val payload = RequestAssumptionsReq(
+                assumptions = listOf(AssumptionItemReq(key, "Execution blocked: $reason"))
+            )
+            controlPlane.requestAssumptions(taskId, payload)
             
             assumptionsPrefs.edit().putBoolean("esc_$taskId", true).apply()
         }
@@ -234,31 +214,7 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
     }
 
     private suspend fun pollQueue(): List<HubQueueResponse> {
-        return withContext(Dispatchers.IO) {
-            try {
-                val req = Request.Builder()
-                    .url(apiClient.apiUrl("hub/queue?max=1"))
-                    .get()
-                    .build()
-                val resp = apiClient.client.newCall(req).execute()
-                if (resp.isSuccessful) {
-                    val bodyStr = resp.body?.string() ?: """"""
-                    val wrapper = jsonParser.decodeFromString<HubQueueListResponse>(bodyStr)
-                    Log.d("HubRuntimeLoop", "hub/queue ok, items=${wrapper.items.size}")
-                    wrapper.items
-                } else if (resp.code == 401 || resp.code == 403) {
-                    Log.e("HubRuntimeLoop", "hub/queue auth error ${resp.code}")
-                    apiClient.store.clearSessionToken()
-                    emptyList()
-                } else {
-                    Log.e("HubRuntimeLoop", "hub/queue http=${resp.code}")
-                    emptyList()
-                }
-            } catch (e: Exception) {
-                Log.e("HubRuntimeLoop", "hub/queue parse/fetch error", e)
-                emptyList()
-            }
-        }
+        return controlPlane.pollQueue(1)
     }
 
     private fun transition(state: BackoffState, msg: String) {

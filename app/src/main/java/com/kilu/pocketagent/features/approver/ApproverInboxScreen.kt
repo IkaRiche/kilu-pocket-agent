@@ -17,9 +17,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
+import com.kilu.pocketagent.core.network.ControlPlaneApi
 
 @Composable
 fun ApproverInboxScreen(apiClient: ApiClient, onResolveRequested: (String) -> Unit, onBack: () -> Unit) {
@@ -29,30 +27,19 @@ fun ApproverInboxScreen(apiClient: ApiClient, onResolveRequested: (String) -> Un
     
     val scope = rememberCoroutineScope()
     val jsonParser = Json { ignoreUnknownKeys = true }
+    val controlPlane = remember { ControlPlaneApi(apiClient.client, apiClient.apiUrl("")) }
 
     fun loadInbox() {
         scope.launch {
             isLoading = true
             errorMsg = null
-            try {
-                val req = Request.Builder()
-                    .url(apiClient.apiUrl("inbox?max=50"))
-                    .get()
-                    .build()
-                val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }
-                
-                if (resp.isSuccessful) {
-                    val bodyStr = resp.body?.string() ?: "{\"events\":[]}"
-                    val inboxResp = jsonParser.decodeFromString<InboxResponse>(bodyStr)
-                    episodes = inboxResp.events.distinctBy { it.event_id }
-                } else {
-                    errorMsg = ErrorHandler.parseError(resp)
-                }
-            } catch(e: Exception) {
-                errorMsg = e.message
-            } finally {
-                isLoading = false
+            val inboxResp = controlPlane.getInbox(50)
+            if (inboxResp != null) {
+                episodes = inboxResp.events.distinctBy { it.event_id }
+            } else {
+                errorMsg = "Failed to load inbox."
             }
+            isLoading = false
         }
     }
 
@@ -154,18 +141,13 @@ fun InboxCard(ep: InboxEvent, apiClient: ApiClient, jsonParser: Json, onAcked: (
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = {
                         scope.launch {
-                            try {
-                                val req = Request.Builder()
-                                    .url(apiClient.apiUrl("inbox/ack"))
-                                    .post("{\"event_id\":\"${ep.event_id}\"}".toRequestBody("application/json".toMediaType()))
-                                    .build()
-                                val resp = withContext(Dispatchers.IO) { apiClient.client.newCall(req).execute() }
-                                if (resp.isSuccessful) {
-                                    isExpanded = true
-                                    isAcked = true
-                                    onAcked()
-                                }
-                            } catch (e: Exception) { }
+                            val controlPlane = ControlPlaneApi(apiClient.client, apiClient.apiUrl(""))
+                            val success = controlPlane.ackInbox(ep.event_id)
+                            if (success) {
+                                isExpanded = true
+                                isAcked = true
+                                onAcked()
+                            }
                         }
                     }) {
                         Text("Acknowledge")
