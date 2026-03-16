@@ -23,8 +23,16 @@ data class HubQueueResponse(
 )
 
 @Serializable
+data class StepInfo(
+    val step_id: String,
+    val step_digest: String
+)
+
+@Serializable
 data class MintStepBatchReq(
-    val size: Int = 1
+    val runtime_id: String,
+    val toolchain_id: String,
+    val steps: List<StepInfo>
 )
 
 @Serializable
@@ -35,13 +43,30 @@ data class MintStepBatchResp(
 )
 
 @Serializable
+data class Evidence(
+    val task_id: String,
+    val step_id: String,
+    val runner_id: String,
+    val adapter: String,
+    val outcome: String,
+    val normalized_action: String? = null,
+    val receipt_ref: String? = null,
+    val started_at: String,
+    val finished_at: String,
+    val exit_code: Int? = null,
+    val stdout_hash: String? = null,
+    val stderr_hash: String? = null,
+    val stdout_truncated: Boolean = false,
+    val stderr_truncated: Boolean = false,
+    val timeout: Boolean = false,
+    val cancelled: Boolean = false,
+    val error_class: String? = null,
+    val error_message: String? = null
+)
+
+@Serializable
 data class SubmitResultReq(
-    val url: String,
-    val extracted_text: String,
-    val headings: List<String> = emptyList(),
-    val summary: String = "",
-    val facts: List<String> = emptyList(),
-    val hashes: JsonObject
+    val evidence: Evidence
 )
 
 @Serializable

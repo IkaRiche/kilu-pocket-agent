@@ -111,10 +111,10 @@ class ControlPlaneApi(
      * Returns true on success, false on quota/error.
      * Throws on unrecoverable 401/403 (token cleared).
      */
-    suspend fun mintStepBatch(grantId: String, size: Int = 1): MintStepBatchResp? =
+    suspend fun mintStepBatch(grantId: String, req: MintStepBatchReq): MintStepBatchResp? =
         withContext(Dispatchers.IO) {
             try {
-                val body = json.encodeToString(MintStepBatchReq(size)).toByteArray()
+                val body = json.encodeToString(req).toByteArray()
                     .toRequestBody(mediaTypeJson)
                 val httpReq = Request.Builder()
                     .url("$baseUrl/grants/$grantId/mint-step-batch")

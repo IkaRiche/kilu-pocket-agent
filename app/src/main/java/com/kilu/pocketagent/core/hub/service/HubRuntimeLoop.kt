@@ -118,12 +118,25 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
             }
 
             // Mint batch checks
+            val runtimeId = apiClient.store.getDeviceId() ?: "android_unknown"
+            val toolchainId = "tc_webview_v1"
+            val stepId = "step_0"
+            val stepDigest = DigestUtil.sha256Hex(task.external_url ?: "")
+            
+            val mintReq = MintStepBatchReq(
+                runtime_id = runtimeId,
+                toolchain_id = toolchainId,
+                steps = listOf(StepInfo(stepId, stepDigest))
+            )
+
+            val startTime = java.time.Instant.now().toString()
+            
             if (task.grant_id == null) {
                 transition(BackoffState.ERROR_QUOTA, "No grant_id provided")
                 delay(backoffPolicy.getDelayMs(BackoffState.ERROR_QUOTA))
                 return@coroutineScope
             }
-            val mintResp = controlPlane.mintStepBatch(task.grant_id, 1)
+            val mintResp = controlPlane.mintStepBatch(task.grant_id, mintReq)
             if (mintResp == null) {
                 transition(BackoffState.ERROR_QUOTA, "Mint failed or exhausted")
                 delay(backoffPolicy.getDelayMs(BackoffState.ERROR_QUOTA))
@@ -171,16 +184,20 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
             val autoSummary = "Successfully extracted ${safeText.length} characters and ${parsedHeadings.size} headings from ${task.external_url} via Headless Edge WebView execution."
             val facts = parsedHeadings.take(5).map { "Heading Extracted: $it" }
 
-            val resPayload = SubmitResultReq(
-                url = task.external_url ?: "",
-                extracted_text = safeText,
-                summary = autoSummary,
-                headings = parsedHeadings,
-                facts = facts,
-                hashes = hashObj
+            val finishedTime = java.time.Instant.now().toString()
+            val evidence = Evidence(
+                task_id = task.task_id,
+                step_id = stepId,
+                runner_id = runtimeId,
+                adapter = "webview",
+                outcome = "success",
+                started_at = startTime,
+                finished_at = finishedTime,
+                stdout_hash = "sha256:" + DigestUtil.sha256Hex(safeText),
+                exit_code = 0
             )
             
-            val ok = controlPlane.submitResult(task.task_id, resPayload)
+            val ok = controlPlane.submitResult(task.task_id, SubmitResultReq(evidence))
             Log.d("HubRuntimeLoop", "Result submit ok=$ok task=${task.task_id}")
             if (ok) {
                 transition(BackoffState.IDLE, "Success on task ${task.task_id.take(8)}")
