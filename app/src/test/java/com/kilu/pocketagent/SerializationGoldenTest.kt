@@ -103,10 +103,37 @@ class SerializationGoldenTest {
     // ── MintStepBatchReq ───────────────────────────────────────────────────────
 
     @Test
-    fun `MintStepBatchReq encodes size field`() {
-        val req = MintStepBatchReq(size = 3)
+    fun `MintStepBatchReq encodes all fields including steps`() {
+        val req = MintStepBatchReq(
+            runtime_id = "run_1",
+            toolchain_id = "tc_1",
+            steps = listOf(StepInfo("step_0", "digest"))
+        )
         val encoded = json.encodeToString(req)
-        assertTrue(encoded.contains("\"size\":3"), "size field missing: $encoded")
+        assertTrue(encoded.contains("\"runtime_id\":\"run_1\""), "runtime_id missing: $encoded")
+        assertTrue(encoded.contains("\"toolchain_id\":\"tc_1\""), "toolchain_id missing: $encoded")
+        assertTrue(encoded.contains("\"steps\""), "steps array missing: $encoded")
+        assertTrue(encoded.contains("\"step_id\":\"step_0\""), "step_id missing: $encoded")
+    }
+
+    // ── SubmitResultReq ────────────────────────────────────────────────────────
+
+    @Test
+    fun `SubmitResultReq encodes evidence correctly`() {
+        val evidence = Evidence(
+            task_id = "tsk_1",
+            step_id = "step_0",
+            runner_id = "run_1",
+            adapter = "webview",
+            outcome = "success",
+            started_at = "2024-01-01T00:00:00Z",
+            finished_at = "2024-01-01T00:00:01Z"
+        )
+        val req = SubmitResultReq(evidence = evidence)
+        val encoded = json.encodeToString(req)
+        assertTrue(encoded.contains("\"evidence\""), "evidence wrapper missing: $encoded")
+        assertTrue(encoded.contains("\"outcome\":\"success\""), "outcome missing: $encoded")
+        assertTrue(encoded.contains("\"started_at\":\"2024-01-01T00:00:00Z\""), "started_at missing: $encoded")
     }
 
     // ── CreateTaskReq ──────────────────────────────────────────────────────────

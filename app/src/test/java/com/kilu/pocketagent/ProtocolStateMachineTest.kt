@@ -72,10 +72,15 @@ class ProtocolStateMachineTest {
         // Server rejects because grant is expired or already used up (400 or 422)
         server.enqueue(MockResponse().setResponseCode(422).setBody("""{"error":"grant_exhausted"}"""))
 
-        val result = api.mintStepBatch("exhausted_grant", size = 1)
+        val req = MintStepBatchReq(
+            runtime_id = "dev_1",
+            toolchain_id = "tc_1",
+            steps = listOf(StepInfo("step_0", "digest"))
+        )
+        val result = api.mintStepBatch("exhausted_grant", req)
         assertNull(result, "Minting on invalid grant must return null (fail-closed)")
-        val req = server.takeRequest()
-        assertTrue(req.path!!.endsWith("/grants/exhausted_grant/mint-step-batch"), "Path consistency check failed")
+        val serverReq = server.takeRequest()
+        assertTrue(serverReq.path!!.endsWith("/grants/exhausted_grant/mint-step-batch"), "Path consistency check failed")
     }
 
     // ── Transition: Submit result twice ────────────────────────────────────────
@@ -86,7 +91,18 @@ class ProtocolStateMachineTest {
         // Contract states: 409 is treated as a success from the client orchestrator perspective (idempotent).
         server.enqueue(MockResponse().setResponseCode(409).setBody("""{"error":"task_already_done"}"""))
 
-        val reqObj = SubmitResultReq(url = "url", extracted_text = "ex", hashes = kotlinx.serialization.json.buildJsonObject {})
+        val evidence = Evidence(
+            task_id = "tsk_1",
+            step_id = "step_0",
+            runner_id = "dev_1",
+            adapter = "webview",
+            outcome = "success",
+            started_at = "2024-01-01T00:00:00Z",
+            finished_at = "2024-01-01T00:00:01Z",
+            stdout_hash = "sha256:abc",
+            exit_code = 0
+        )
+        val reqObj = SubmitResultReq(evidence = evidence)
         val result = api.submitResult("tsk_already_done", reqObj)
         
         assertTrue(result, "HTTP 409 must be treated as success in submitResult because it means task is already DONE")
@@ -108,11 +124,27 @@ class ProtocolStateMachineTest {
         
         // Test mintStepBatch
         server.enqueue(MockResponse().setResponseCode(401))
-        api.mintStepBatch("gr_123", 1)
+        val mintReq = MintStepBatchReq(
+            runtime_id = "dev_1",
+            toolchain_id = "tc_1",
+            steps = listOf(StepInfo("step_0", "digest"))
+        )
+        api.mintStepBatch("gr_123", mintReq)
         
         // Test submitResult
         server.enqueue(MockResponse().setResponseCode(403))
-        api.submitResult("tsk_abc", SubmitResultReq(url = "u", extracted_text = "t", hashes = kotlinx.serialization.json.buildJsonObject {}))
+        val evidence = Evidence(
+            task_id = "tsk_1",
+            step_id = "step_0",
+            runner_id = "dev_1",
+            adapter = "webview",
+            outcome = "success",
+            started_at = "2024-01-01T00:00:00Z",
+            finished_at = "2024-01-01T00:00:01Z",
+            stdout_hash = "sha256:abc",
+            exit_code = 0
+        )
+        api.submitResult("tsk_abc", SubmitResultReq(evidence = evidence))
 
         assertEquals(4, tokenClearedCount, "onAuthFailure must be called exactly 4 times (once per endpoint auth error)")
     }

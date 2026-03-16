@@ -133,13 +133,18 @@ class MalformedResponseTest {
     fun `submitResult returns false on 500 - does not pretend success`() = runTest {
         server.enqueue(MockResponse().setResponseCode(500))
 
-        val fakeHashes = kotlinx.serialization.json.buildJsonObject { }
-        val req = SubmitResultReq(
-            url = "https://example.com",
-            extracted_text = "some text",
-            summary = "summary",
-            hashes = fakeHashes
+        val evidence = Evidence(
+            task_id = "tsk_1",
+            step_id = "step_0",
+            runner_id = "dev_1",
+            adapter = "webview",
+            outcome = "success",
+            started_at = "2024-01-01T00:00:00Z",
+            finished_at = "2024-01-01T00:00:01Z",
+            stdout_hash = "sha256:abc",
+            exit_code = 0
         )
+        val req = SubmitResultReq(evidence = evidence)
 
         val result = api.submitResult("tsk_1", req)
         assertFalse(result, "submitResult must return false on 500, not true")
@@ -149,13 +154,18 @@ class MalformedResponseTest {
     fun `submitResult returns false on 400`() = runTest {
         server.enqueue(MockResponse().setResponseCode(400).setBody("""{"code":"ERR_BAD_REQUEST"}"""))
 
-        val fakeHashes = kotlinx.serialization.json.buildJsonObject { }
-        val req = SubmitResultReq(
-            url = "https://example.com",
-            extracted_text = "text",
-            summary = "summary",
-            hashes = fakeHashes
+        val evidence = Evidence(
+            task_id = "tsk_1",
+            step_id = "step_0",
+            runner_id = "dev_1",
+            adapter = "webview",
+            outcome = "success",
+            started_at = "2024-01-01T00:00:00Z",
+            finished_at = "2024-01-01T00:00:01Z",
+            stdout_hash = "sha256:abc",
+            exit_code = 0
         )
+        val req = SubmitResultReq(evidence = evidence)
 
         val result = api.submitResult("tsk_1", req)
         assertFalse(result, "submitResult must return false on 400")
