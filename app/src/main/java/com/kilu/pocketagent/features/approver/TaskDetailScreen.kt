@@ -207,6 +207,3 @@ private fun deriveTimeline(task: ApproverTaskItem): List<TaskLifecycleStep> {
 
     return result
 }
-
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.foundation.background
