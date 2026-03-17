@@ -33,7 +33,9 @@ data class DeviceInfo(
     val status: String,
     val last_seen_at: String? = null,
     val app_version: String? = null,
-    val created_at: String? = null
+    val created_at: String? = null,
+    val toolchain_id: String? = null,
+    val runtime_status: String? = null
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -265,6 +267,31 @@ private fun DeviceCard(device: DeviceInfo, isCurrentDevice: Boolean, onCopyId: (
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+
+            if (device.device_type == "HUB" && device.toolchain_id != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        shape = MaterialTheme.shapes.extraSmall
+                    ) {
+                        Text(
+                            text = device.toolchain_id,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
+                    if (device.runtime_status != null) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "Runtime: ${device.runtime_status}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
         }
     }

@@ -44,7 +44,10 @@ data class PlanPreviewResp(
     val allowlist_domains: List<String>,
     val forbidden_flags: JsonObject,
     val summary: String? = null,
-    val steps_preview: List<PlanStep>? = null
+    val steps_preview: List<PlanStep>? = null,
+    val runtime_id: String? = null,
+    val toolchain_id: String? = null,
+    val hub_name: String? = null
 )
 
 @Serializable

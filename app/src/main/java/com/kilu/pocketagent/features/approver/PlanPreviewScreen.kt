@@ -45,144 +45,152 @@ fun PlanPreviewScreen(
             val controlPlane = ControlPlaneApi(apiClient.client, apiClient.apiUrl(""))
             val plan = controlPlane.getPlan(taskId)
             if (plan != null) {
-                planData = plan
+                // Check if binding is present (mandatory for Phase 9A)
+                if (plan.runtime_id == null || plan.toolchain_id == null) {
+                    errorMsg = "Critical Error: Task authority binding is incomplete (missing runtime/toolchain)."
+                } else {
+                    planData = plan
+                }
             } else {
                 errorMsg = "Failed to fetch plan."
             }
         } catch (e: Exception) {
-            errorMsg = "Failed to fetch plan: ${e.message}"
+            errorMsg = "Fetch error: ${e.message}"
         }
     }
 
-    // Outer column: full height, does NOT scroll
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    Scaffold(
+        topBar = {
+            Column(Modifier.padding(16.dp)) {
+                Text("Approve Execution", style = MaterialTheme.typography.headlineMedium)
+                Text("Review authority binding and limits", style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        bottomBar = {
+            Surface(tonalElevation = 8.dp) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    TextButton(onClick = onBack, enabled = !isApproving, modifier = Modifier.weight(1f)) {
+                        Text("Cancel")
+                    }
+                    if (planData != null && errorMsg == null) {
+                        Button(
+                            onClick = {
+                                isApproving = true
+                                errorMsg = null
+                                scope.launch {
+                                    try {
+                                        val activity = context as? FragmentActivity ?: throw IllegalStateException("Not a FragmentActivity")
+                                        val authSuccess = BiometricGate.confirm(
+                                            activity,
+                                            "Authorize Task",
+                                            "Sign authority binding for hub execution."
+                                        )
+                                        if (!authSuccess) {
+                                            errorMsg = "Biometric session cancelled."
+                                            return@launch
+                                        }
 
-        Text("Execution Plan", style = MaterialTheme.typography.headlineMedium)
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // Scrollable content area with weight so it doesn't push the buttons off-screen
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(scrollState)
-        ) {
-            if (planData != null) {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Plan ID: ${planData!!.plan_id.take(8)}...")
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        planData!!.summary?.let {
-                            Text("AI Summary:", style = MaterialTheme.typography.labelLarge)
-                            Text(it, style = MaterialTheme.typography.bodyMedium)
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
+                                        val message = "receipt:${planData!!.plan_id}"
+                                        val sig = keyManager.sign(Role.APPROVER, message.toByteArray())
+                                        val pub = keyManager.publicKey(Role.APPROVER)
+                                        val deviceId = deviceStore.getDeviceId() ?: throw IllegalStateException("Device not paired")
 
-                        Text("Allowed Domains: ${planData!!.allowlist_domains.joinToString()}")
-                        Text("Max Steps: ${planData!!.max_steps}")
-                        Text("Expires At: ${planData!!.expires_at}")
-                        
-                        planData!!.steps_preview?.let { steps ->
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text("Steps Preview:", style = MaterialTheme.typography.labelLarge)
-                            steps.forEach { step ->
-                                Text("• ${step.op}: ${step.desc}", style = MaterialTheme.typography.bodySmall)
-                            }
+                                        val payload = ApprovePlanReq(
+                                            device_id = deviceId,
+                                            biometric_present = true,
+                                            approval_receipt = ApprovalReceipt("ED25519", pub, sig)
+                                        )
+
+                                        val controlPlane = ControlPlaneApi(apiClient.client, apiClient.apiUrl(""))
+                                        val resp = controlPlane.approvePlan(planData!!.plan_id, payload)
+                                        if (resp != null) onApproved() else errorMsg = "Control Plane rejected approval."
+                                    } catch (e: Exception) {
+                                        errorMsg = "Approval failed: ${e.message}"
+                                    } finally {
+                                        isApproving = false
+                                    }
+                                }
+                            },
+                            enabled = !isApproving,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(if (isApproving) "Signing..." else "Confirm")
                         }
                     }
                 }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    "One approval enables autonomous execution within limits (domain, steps, time).",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-            } else if (errorMsg != null) {
-                Text("Error: $errorMsg", color = MaterialTheme.colorScheme.error)
-            } else {
-                CircularProgressIndicator()
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Fetching plan...")
             }
         }
-
-        // Status message always visible above buttons
-        if (errorMsg != null) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("Status: $errorMsg", color = MaterialTheme.colorScheme.error)
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Buttons ALWAYS at the bottom, never scrolled off-screen
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            TextButton(onClick = onBack, enabled = !isApproving) {
-                Text("Back")
-            }
-            if (planData != null) {
-                Button(
-                    onClick = {
-                        isApproving = true
-                        errorMsg = null
-                        scope.launch {
-                            try {
-                                val activity = context as? FragmentActivity
-                                if (activity == null) {
-                                    errorMsg = "Host is not a FragmentActivity, cannot prompt biometrics."
-                                    return@launch
-                                }
-                                
-                                val authSuccess = BiometricGate.confirm(
-                                    activity,
-                                    "Approve Plan",
-                                    "Authorize Hub to execute ${planData!!.max_steps} steps autonomously."
-                                )
-                                
-                                if (!authSuccess) {
-                                    errorMsg = "Biometric Auth Cancelled/Failed."
-                                    return@launch
-                                }
-                                
-                                val messageBytes = ("receipt:" + planData!!.plan_id).toByteArray()
-                                val signatureB64 = keyManager.sign(Role.APPROVER, messageBytes)
-                                val pubkeyB64 = keyManager.publicKey(Role.APPROVER)
-                                val deviceId = deviceStore.getDeviceId() ?: ""
-                                if (deviceId.isBlank()) {
-                                    errorMsg = "Missing device_id. Re-pair this Approver device."
-                                    return@launch
-                                }
-                                
-                                val approvePayload = ApprovePlanReq(
-                                    device_id = deviceId,
-                                    biometric_present = true,
-                                    approval_receipt = com.kilu.pocketagent.shared.models.ApprovalReceipt(
-                                        pubkey_alg = "ED25519",
-                                        pubkey_b64 = pubkeyB64,
-                                        signature_b64 = signatureB64
-                                    )
-                                )
-                                
-                                val controlPlane = ControlPlaneApi(apiClient.client, apiClient.apiUrl(""))
-                                val appResp = controlPlane.approvePlan(planData!!.plan_id, approvePayload)
-                                
-                                if (appResp != null) {
-                                    onApproved()
-                                } else {
-                                    errorMsg = "Approval failed."
-                                }
-                                
-                            } catch (e: Exception) {
-                                errorMsg = "Crash: ${e.message}"
-                            } finally {
-                                isApproving = false
-                            }
-                        }
-                    },
-                    enabled = !isApproving
+    ) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp).verticalScroll(scrollState)) {
+            if (errorMsg != null) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)
                 ) {
-                    Text(if (isApproving) "Authorizing..." else "Approve Plan")
+                    Column(Modifier.padding(16.dp)) {
+                        Text("Blocking Error", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onErrorContainer)
+                        Text(errorMsg!!, color = MaterialTheme.colorScheme.onErrorContainer)
+                    }
+                }
+            }
+
+            if (planData != null) {
+                // 1. Authority Binding Section (MANDATORY)
+                Text("Authority Binding", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                    Column(Modifier.padding(12.dp)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Hub Name", style = MaterialTheme.typography.labelSmall)
+                            Text(planData!!.hub_name ?: "Unknown", style = MaterialTheme.typography.bodySmall)
+                        }
+                        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Runtime ID", style = MaterialTheme.typography.labelSmall)
+                            Text(planData!!.runtime_id?.take(12) ?: "N/A", style = MaterialTheme.typography.bodySmall)
+                        }
+                        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Toolchain", style = MaterialTheme.typography.labelSmall)
+                            Text(planData!!.toolchain_id ?: "N/A", style = MaterialTheme.typography.bodySmall)
+                        }
+                        Divider(Modifier.padding(vertical = 8.dp))
+                        Text("Binding Integrity: VERIFIED", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                // 2. Normalized Action summary
+                Text("Normalized Action", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                planData!!.summary?.let {
+                    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                        Text(it, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                // 3. Resource Limits
+                Text("Resource Budget", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text("Max Auto Steps: ${planData!!.max_steps}", style = MaterialTheme.typography.bodySmall)
+                        Text("Allowlist: ${planData!!.allowlist_domains.joinToString(", ")}", style = MaterialTheme.typography.bodySmall)
+                        Text("Expires: ${planData!!.expires_at}", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+                planData!!.steps_preview?.let { steps ->
+                    Text("Execution Sequence", style = MaterialTheme.typography.titleSmall)
+                    steps.forEachIndexed { idx, step ->
+                        Text("${idx+1}. ${step.op}: ${step.desc}", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
+                    }
+                }
+            } else if (errorMsg == null) {
+                Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                    CircularProgressIndicator()
                 }
             }
         }

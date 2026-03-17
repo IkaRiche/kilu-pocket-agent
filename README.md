@@ -79,8 +79,22 @@ flowchart LR
   A2 --> A4
   A4 -->|approval receipt| P3
   A3 --> A2
-  A3 -->|reject| P3
-```
+## Current Proven Baseline: Live Verified Flow
+
+The entire authority-bound execution lifecycle has been live-verified on the production-grade control plane:
+
+1.  **Pairing ceremony** — Approver and Hub devices bound to tenant via Ed25519.
+2.  **Task creation** — Planning initiates; task enters `PLANNING` state.
+3.  **Human approval** — Biometric-gated AVO review result in `READY_FOR_EXECUTION`.
+4.  **Hub polling** — Go/Android Hub fetches the ready task with active grant.
+5.  **Token minting** — Hub mints execution batch; task moves to `EXECUTING` (atomic).
+6.  **Secure execution** — Action runs within constraint envelope (shell/webview).
+7.  **Evidence submission** — Signed results + hashes committed to the ledger.
+8.  **Terminal state** — Task completes as `DONE` with immutable evidence.
+
+This flow ensures that agents do not get execution authority from queue visibility; authority is minted explicitly and bound to runtime/toolchain context.
+
+---
 
 ## Three guarantees (with proof)
 

@@ -336,6 +336,23 @@ class ControlPlaneApi(
             }
         }
 
+    suspend fun getTask(taskId: String): ApproverTaskItem? =
+        withContext(Dispatchers.IO) {
+            try {
+                val req = Request.Builder().url("$baseUrl/tasks/$taskId").get().build()
+                val resp = client.newCall(req).execute()
+                when {
+                    resp.isSuccessful -> {
+                        val body = resp.body?.string() ?: ""
+                        // The server returns { "task": { ... } }
+                        val wrapper = json.decodeFromString<Map<String, ApproverTaskItem>>(body)
+                        wrapper["task"]
+                    }
+                    else -> null
+                }
+            } catch (e: Exception) { null }
+        }
+
     suspend fun cancelTask(taskId: String): Boolean =
         withContext(Dispatchers.IO) {
             try {

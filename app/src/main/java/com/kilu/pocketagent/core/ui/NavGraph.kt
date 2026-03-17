@@ -88,8 +88,10 @@ fun NavGraph() {
                 },
                 onNewTaskClick = { navController.navigate("approver_new_task") },
                 onTaskClick = { taskId, status -> 
-                    if (status == "NEEDS_PLAN_APPROVAL") {
+                    if (status == "NEEDS_PLAN_APPROVAL" || status == "PLANNING") {
                         navController.navigate("approver_plan/$taskId")
+                    } else {
+                        navController.navigate("approver_task_detail/$taskId")
                     }
                 },
                 onInboxClick = { navController.navigate("approver_inbox") },
@@ -141,6 +143,14 @@ fun NavGraph() {
                         popUpTo("approver_home") { inclusive = true }
                     }
                 },
+                onBack = { navController.navigateUp() }
+            )
+        }
+        composable("approver_task_detail/{taskId}") { backStackEntry ->
+            val tId = backStackEntry.arguments?.getString("taskId") ?: ""
+            com.kilu.pocketagent.features.approver.TaskDetailScreen(
+                taskId = tId,
+                apiClient = apiClient,
                 onBack = { navController.navigateUp() }
             )
         }
