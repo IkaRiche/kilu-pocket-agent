@@ -11,6 +11,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.background
 import com.kilu.pocketagent.core.network.ApiClient
 import com.kilu.pocketagent.core.network.ControlPlaneApi
 import com.kilu.pocketagent.shared.models.ApproverTaskItem
