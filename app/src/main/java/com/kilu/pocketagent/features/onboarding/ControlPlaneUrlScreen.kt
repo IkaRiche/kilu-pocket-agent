@@ -19,7 +19,7 @@ fun ControlPlaneUrlScreen(store: DeviceProfileStore, onComplete: () -> Unit) {
     }
 
     Scaffold(
-        windowInsets = WindowInsets(0),
+        contentWindowInsets = WindowInsets(0),
         bottomBar = {
             // navigationBarsPadding: button above nav bar
             // imePadding: URL keyboard pushes button up

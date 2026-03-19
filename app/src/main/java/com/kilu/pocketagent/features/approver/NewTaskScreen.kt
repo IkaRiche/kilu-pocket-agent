@@ -33,14 +33,13 @@ fun NewTaskScreen(apiClient: ApiClient, onCreated: (String) -> Unit, onCancel: (
     val scrollState = rememberScrollState()
 
     Scaffold(
-        windowInsets = WindowInsets(0),
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = { Text("New Task") },
                 navigationIcon = {
                     TextButton(onClick = onCancel) { Text("Cancel") }
-                },
-                windowInsets = WindowInsets(0)
+                }
             )
         },
         bottomBar = {

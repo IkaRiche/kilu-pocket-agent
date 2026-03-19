@@ -249,5 +249,3 @@ fun ApproverTasksHomeScreen(
         }
     }
 }
-
-}

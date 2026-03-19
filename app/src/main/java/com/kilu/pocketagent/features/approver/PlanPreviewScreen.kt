@@ -68,7 +68,7 @@ fun PlanPreviewScreen(
     }
 
     Scaffold(
-        windowInsets = WindowInsets(0),
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             Column(Modifier.padding(16.dp)) {
                 Text("Approve Execution", style = MaterialTheme.typography.headlineMedium)
