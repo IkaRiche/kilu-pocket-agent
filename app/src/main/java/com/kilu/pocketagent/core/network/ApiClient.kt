@@ -28,7 +28,8 @@ class ApiClient(val store: DeviceProfileStore) {
 
     fun apiUrl(path: String): String {
         val p = path.trim().removePrefix("/")
-        return "${baseOrigin()}/v1/$p"
+        val base = "${baseOrigin()}/v1"
+        return if (p.isEmpty()) base else "$base/$p"
     }
 
     fun getBaseUrl(): String = baseOrigin() // Compatibility or remove later
