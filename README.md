@@ -1,222 +1,158 @@
 # KiLu Pocket Agent
-**The end of god-mode agents.**  
+
+**The end of god-mode agents.**
 A split-trust mobile agent where **the cloud can think**, but **the phone can only act with cryptographic authority**.
 
-> KiLu separates *brains* from *hands*:  
-> **Hub** executes in a constrained sandbox.  
-> **Approver** holds keys and confirms intent with biometrics.  
+> KiLu separates *brains* from *hands*:
+> **Hub** executes in a constrained sandbox.
+> **Approver** holds keys and confirms intent with biometrics.
 > **Control Plane** enforces deterministic policy and issues single-use capability tokens.
 
-<p align="center">
-  <!-- Replace with a real GIF or short mp4 poster -->
-  <img src="assets/hero.gif" width="720" alt="KiLu demo: attack → blocked → approve → evidence" />
-</p>
+---
 
-<p align="center">
-  <a href="https://github.com/IkaRiche/kilu-pocket-agent/releases/latest"><img alt="version" src="https://img.shields.io/github/v/release/IkaRiche/kilu-pocket-agent?color=purple&style=flat-square"></a>
-  <a href="https://github.com/IkaRiche/kilu-pocket-agent/actions"><img alt="build" src="https://img.shields.io/github/actions/workflow/status/IkaRiche/kilu-pocket-agent/release.yml?branch=main&style=flat-square"></a>
-  <a href="SECURITY.md"><img alt="security" src="https://img.shields.io/badge/security-by--design-black?style=flat-square"></a>
-  <a href="LICENSE"><img alt="license" src="https://img.shields.io/github/license/IkaRiche/kilu-pocket-agent?style=flat-square"></a>
-</p>
+## Current Status — Phase 10A ✅
+
+This app is the **Android Approver + Hub** client for the KiLu Network.
+
+| Component | Status |
+|---|---|
+| Approver pairing ceremony | ✅ Live |
+| Task creation (free text + skill) | ✅ Live |
+| Plan approval (biometric Ed25519 signing) | ✅ Live |
+| Hub device registration + runtime binding | ✅ Live |
+| Hub task queue polling | ✅ Live (Phase 10A: runtime-bound + grant-gated) |
+| Step token minting via `mint-step-batch` | ✅ Live |
+| Device list screen | ✅ Live |
+
+**Backend:** [KiLu-Network](https://github.com/IkaRiche/KiLu-Network) — Cloud CP commit `3728d28` (31/31 tests green).
+
+### Coming in Phase 10B
+- Telegram Bot as conversational ingress (`telegram-bot/` in KiLu-Network)
+- Android Approver remains the **only authority device** — Telegram does not approve tasks
 
 ---
 
 ## Why this exists
-Most "agent frameworks" implicitly grant the LLM **god-mode**: unlimited tool access, long feedback loops, and high-variance behavior.
+
+Most "agent frameworks" implicitly grant the LLM **god-mode**: unlimited tool access, long feedback loops, and unverifiable behavior.
 
 KiLu is built for the opposite:
-- **Authority is explicit** (capability tokens + human signatures).
-- **Execution is constrained** (Hub refuses without cryptographic mandate).
-- **Outcomes are auditable** (evidence hashes + receipts).
+- **Authority is explicit** — capability tokens + human biometric signatures
+- **Execution is constrained** — Hub refuses without cryptographic mandate
+- **Outcomes are auditable** — evidence hashes + receipts, offline-verifiable
 
-If you care about **security**, **predictable cost**, and **verifiable intent**, this architecture is the point.
-
----
-
-## What you get
-- **Split-trust**: Planner ≠ Executor ≠ Human authority.
-- **Fail-closed execution**: no valid StepToken → no execution.
-- **Replay protection**: single-use JTI + expiry on every capability.
-- **Tamper-evident results**: evidence hashes bound to each step/result.
-- **Human-gated**: approvals require biometric presence + signature.
-- **LLM-agnostic**: works with cloud LLMs or local models (see [Local LLM mode](#local-llm-mode-no-paid-api-keys)).
-
-> Important: KiLu does **not** rely on "trust the model". It relies on **cryptographic constraints**.
+> KiLu does **not** rely on "trust the model". It relies on **cryptographic constraints**.
 
 ---
 
 ## Architecture (Zero-Trust Split-Trust)
+
 ```mermaid
 flowchart LR
   subgraph Cloud["☁️ Control Plane (policy + issuance)"]
-    P1["Policy Engine\n(normalization, allowlist, budgets)"]
-    P2["Capability Minting\nStepToken(JTI, exp, scopes)"]
-    P3["Audit Store\n(episodes, receipts, evidence hashes)"]
+    P1["Token Minting\nStepToken(JTI, exp, bindings)"]
+    P2["Audit Store\n(receipts, evidence hashes)"]
   end
 
   subgraph Hub["📱 Hub (Executor)"]
-    H1["WebView Sandbox\nExtract-only digest"]
+    H1["Toolchain Sandbox\nBrowser / HTTP / FS"]
     H2["StepToken Validator\nfail-closed"]
     H3["Evidence Builder\nsha256 artifacts"]
-    H4["(Optional) Local LLM\ncompress/plan/risk-hints"]
   end
 
   subgraph Approver["📱 Approver (Human Authority)"]
-    A1["Key Store\n(device-local keys)"]
-    A2["Biometric Gate\npresence check"]
-    A3["AVO Review Card\ncanonical intent + scope"]
-    A4["Signed Approval Receipt\nEd25519"]
-    A5["(Optional) Local LLM\nexplain + risk hints"]
+    A1["Android Keystore\nEd25519 non-exportable"]
+    A2["Biometric Gate"]
+    A3["AVO Review Card\ncanonical plan"]
+    A4["Signed Approval Receipt"]
   end
 
-  P1 --> P2
-  P2 -->|StepToken batch| H2
-  H1 -->|digest + hashes| P1
+  P1 -->|StepToken batch| H2
   H2 --> H1
-  H2 -->|execute| H1
-  H3 -->|evidence hash + result| P3
-  P3 -->|AVO request| A3
-  A2 --> A4
-  A4 -->|approval receipt| P3
-  A3 --> A2
-## Current Proven Baseline: Live Verified Flow
-
-The entire authority-bound execution lifecycle has been live-verified on the production-grade control plane:
-
-1.  **Pairing ceremony** — Approver and Hub devices bound to tenant via Ed25519.
-2.  **Task creation** — Planning initiates; task enters `PLANNING` state.
-3.  **Human approval** — Biometric-gated AVO review result in `READY_FOR_EXECUTION`.
-4.  **Hub polling** — Go/Android Hub fetches the ready task with active grant.
-5.  **Token minting** — Hub mints execution batch; task moves to `EXECUTING` (atomic).
-6.  **Secure execution** — Action runs within constraint envelope (shell/webview).
-7.  **Evidence submission** — Signed results + hashes committed to the ledger.
-8.  **Terminal state** — Task completes as `DONE` with immutable evidence.
-
-This flow ensures that agents do not get execution authority from queue visibility; authority is minted explicitly and bound to runtime/toolchain context.
+  H3 -->|evidence hash| P2
+  P2 -->|AVO request| A3
+  A3 --> A2 --> A4 -->|approval receipt| P2
+```
 
 ---
 
 ## Three guarantees (with proof)
 
-1. **Fail-closed**: without a valid StepToken, Hub refuses execution.
-2. **Replay-proof**: each capability is single-use (JTI) and time-bounded (exp).
-3. **Tamper-evident**: every output is bound to evidence hashes and receipts.
+1. **Fail-closed** — without a valid StepToken, Hub refuses execution.
+2. **Replay-proof** — each capability is single-use (JTI) and time-bounded (exp).
+3. **Tamper-evident** — every output is bound to evidence hashes and receipts.
 
-**See the Proof Docs:**
-- [GUARANTEES.md](GUARANTEES.md) (property → mechanism → proof/tests)
-- [THREAT_MODEL.md](THREAT_MODEL.md) (STRIDE + mitigations)
-- [BENCHMARKS.md](BENCHMARKS.md) (token/step governance)
-- [SECURITY.md](SECURITY.md) (disclosure + supported versions)
+See [KiLu-Network/GUARANTEES.md](https://github.com/IkaRiche/KiLu-Network/blob/main/GUARANTEES.md).
 
 ---
 
-## Quickstart (10 minutes)
+## Quick Start (10 minutes)
 
-### 0) Prereqs
-Two Android devices (or one device + emulator):
-*   **Hub** (always-on executor)
-*   **Approver** (keys + biometrics)
-*   A running Control Plane (Cloudflare Worker or local dev)
+### Prerequisites
 
-### 1) Control Plane (Cloudflare Worker)
+- Two Android devices (or one device + emulator): **Hub** + **Approver**
+- Running Control Plane: [KiLu-Network cloud/](https://github.com/IkaRiche/KiLu-Network/tree/main/cloud)
+
 ```bash
-# example
-cd cloud
-npm install
-npx wrangler dev
+# Control Plane (local dev)
+cd cloud && npm install && wrangler dev --local
+
+# Android app
+./gradlew assembleDevDebug
+# Install on both Hub and Approver devices
 ```
 
-### 2) Android app
-```bash
-# example (Android Studio)
-./gradlew assembleDebug
-```
-Install on both devices.
+### Pairing flow
 
-### 3) Configure Control Plane URL
-On both Hub and Approver:
-*   Set Control Plane URL (must be https in prod mode)
-*   Verify "Diagnostics" shows the correct API base.
-
-### 4) Pair Approver → Pair Hub
-*   **On Approver:** Register as Approver (creates device identity)
-*   **On Approver:** Devices → "Pair a Hub" (generates QR)
-*   **On Hub:** Scan QR → Confirm & Connect
-
-### 5) Run a demo episode
-*   Create a simple read-only extraction task
-*   Approve if requested
-*   Hub executes, submits result + evidence hash
+1. **Approver** → Register as Approver (creates Ed25519 device identity)
+2. **Approver** → Devices → "Pair a Hub" (generates QR code)
+3. **Hub** → Scan QR → Confirm & Connect
+4. **Hub** → Hub is now online and ready to receive tasks
 
 ---
 
-## Local LLM mode (no paid API keys)
+## AVO Review Standard v0.5
 
-KiLu can run without paid cloud LLMs by using local inference for:
-*   digest compression
-*   draft plan generation (as a proposal)
-*   risk hints / injection flags
-*   approval explanations on Approver
+The approval UI MUST display the following **without truncation**:
 
-Control Plane remains in Cloudflare (cheap, stable) for:
-*   deterministic policy
-*   capability issuance (JTI/exp/scopes/bindings)
-*   replay protection + audit logs
+1. **Header**: verb + object (`e.g. "Execute: tracer echo"`)
+2. **Target runtime**: Hub device and `runtime_id`
+3. **Constraints**: max steps, allowed domains, time window
+4. **Fingerprint**: `AVO#<base32(avo_hash[:5])>` — human-verifiable short code
+5. **Risk badges**: External domain / High-risk / New scope
 
-**Recommended topology**
-*   **Hub:** local LLM (primary)
-*   **Approver:** optional local LLM (approval copilot)
-
-**"Authority" rule**
-Local LLM outputs are advisory. Only these artifacts authorize execution:
-1.  **StepToken** (Control Plane signature)
-2.  **Approval receipt** (Approver signature, if required)
+> **Hard deny:** if the app cannot render a known AVO template, approval is blocked. No silent fallback. This satisfies RT-05.
 
 ---
 
-## Token efficiency (why KiLu is cheaper to operate)
+## Approval Receipt Signing
 
-Most agent stacks burn tokens due to: full-page context flooding (HTML/screenshots), long "think loop" retries, and re-reading unchanged pages.
-
-KiLu reduces cost structurally:
-*   extract-only digest (compact, deterministic)
-*   bounded episodes (budgets + fail-closed)
-*   dedupe + caching (no reprocessing unchanged states)
-*   early escalation (human circuit-breaker)
-
-See [BENCHMARKS.md](BENCHMARKS.md) for reproducible measurements.
+An `ApprovalReceipt` binds:
+- `avo_hash` — SHA256 of canonical AVO bytes
+- `decision_commitment` — from Trust Center decision
+- `device_id`, `timestamp`, `receipt_id`
+- **Signature**: Ed25519 over all above fields, Android Keystore, biometric required
 
 ---
 
-## Security model (high level)
+## Device Keys
 
-KiLu is designed for adversarial conditions: prompt injection, malicious webpage content, replay attempts, "evil maid" pairing substitution, and accidental overreach by the LLM.
-
-**Threat model and mitigations:**
-*   [THREAT_MODEL.md](THREAT_MODEL.md)
-*   [SECURITY.md](SECURITY.md)
-
-*NOTE on device keys: current builds may use device-local keys protected at rest (EncryptedSharedPreferences). A planned/optional upgrade path is non-exportable Android Keystore/StrongBox when enabled and verified.*
+| Property | Current | Planned |
+|---|---|---|
+| Key generation | On-device Ed25519 | Same |
+| Storage | EncryptedSharedPreferences (AES-256-SIV) | Android Keystore / StrongBox |
+| Exportable | Yes (encrypted at rest) | No (hardware-backed) |
+| Biometric required | Yes (for signing) | Yes |
 
 ---
 
-## Repo map
-*   `app/` — Android app (Approver + Hub roles)
-*   `cloud/` — Control Plane (Cloudflare Worker)
-*   `docs/` — architecture, threat model, guarantees, benchmarks
-*   `assets/` — diagrams, screenshots, hero GIF
+## Related Repositories
 
-## Roadmap
-*   **v0.x:** UX polish, strict fail-closed enforcement + tests, reproducible benchmarks
-*   **v1.x:** local LLM provider interface, self-hosted control plane option
-*   **Enterprise:** SIEM hooks, KMS integration, compliance mapping
+- [KiLu-Network](https://github.com/IkaRiche/KiLu-Network) — Cloud Control Plane, Go runner, verifier, trust-center, Telegram bot
+- [ROADMAP.md](https://github.com/IkaRiche/KiLu-Network/blob/main/ROADMAP.md) — Product specification v2.0 + shipped status
 
-See [ROADMAP.md](ROADMAP.md).
-
-## Contributing
-We welcome PRs, but we take security seriously. 
-*   Read [CONTRIBUTING.md](CONTRIBUTING.md)
-*   Report vulnerabilities via [SECURITY.md](SECURITY.md)
+---
 
 ## License
-Apache-2.0. See [LICENSE](LICENSE).
+
+Business Source License 1.1 — see [LICENSE](LICENSE).
