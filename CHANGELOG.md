@@ -2,6 +2,22 @@
 
 All notable changes to KiLu Pocket Agent.
 
+## [0.9.3] — 2026-03-19
+
+### Added / Improved
+- **Phase B: KiluComponents library** — new `KiluComponents.kt` in `core/ui/components/`:
+  - `KiluCard` — tonal card with status-mapped accent border and 14dp corners
+  - `KiluPrimaryButton` — gradient Primary→Violet fill, 52dp height, built-in loading state
+  - `KiluTopBar` — screen header with bold title and brand accent underline
+  - `KiluSectionHeader` — labeled section divider with left accent bar and uppercase spacing
+  - `KiluStatBadge` — colored stat tile with tinted background and border (replaces old `StatCard`)
+  - `KiluDivider` — 0.5dp subtle separator
+  - `KiluBindingRow` — key/value row for authority binding display
+- **KiluShapes** — consistent shape system in `KiluTheme` (8/10/14/20/28dp radius ladder)
+- **TaskCard** — upgraded to use `KiluCard` with status-accent border (green/amber/blue/red)
+- **PlanPreviewScreen** — authority binding, resource budget, execution sequence all use `KiluCard` + `KiluSectionHeader` + `KiluBindingRow`. Confirm uses `KiluPrimaryButton` with gradient.
+- **ApproverTasksHomeScreen** — `StatCard` replaced with `KiluStatBadge`; `KiluSectionHeader` added above task list; Pair Hub button uses `shapes.medium`
+
 ## [0.9.2] — 2026-03-19
 
 ### Fixed

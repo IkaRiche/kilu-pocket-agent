@@ -19,8 +19,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.kilu.pocketagent.core.network.ApiClient
 import com.kilu.pocketagent.core.ui.components.EmptyState
+import com.kilu.pocketagent.core.ui.components.KiluSectionHeader
+import com.kilu.pocketagent.core.ui.components.KiluStatBadge
 import com.kilu.pocketagent.core.ui.components.StatusChip
 import com.kilu.pocketagent.core.ui.components.TaskCard
+import com.kilu.pocketagent.core.ui.theme.StatusApproved
+import com.kilu.pocketagent.core.ui.theme.StatusPending
 import com.kilu.pocketagent.shared.models.ApproverTaskItem
 import com.kilu.pocketagent.shared.models.QuotasResp
 import com.kilu.pocketagent.shared.utils.ErrorHandler
@@ -147,22 +151,22 @@ fun ApproverTasksHomeScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    StatCard("Active", "$activeCount", MaterialTheme.colorScheme.tertiary, Modifier.weight(1f))
-                    StatCard("Pending", "$pendingCount", com.kilu.pocketagent.core.ui.theme.StatusPending, Modifier.weight(1f))
-                    StatCard("Done", "$doneCount", com.kilu.pocketagent.core.ui.theme.StatusApproved, Modifier.weight(1f))
-                    StatCard("Credits", "${q.planner_credits}", MaterialTheme.colorScheme.primary, Modifier.weight(1f))
+                    KiluStatBadge("Active", "$activeCount", MaterialTheme.colorScheme.tertiary, Modifier.weight(1f))
+                    KiluStatBadge("Pending", "$pendingCount", StatusPending, Modifier.weight(1f))
+                    KiluStatBadge("Done", "$doneCount", StatusApproved, Modifier.weight(1f))
+                    KiluStatBadge("Credits", "${q.planner_credits}", MaterialTheme.colorScheme.primary, Modifier.weight(1f))
                 }
             }
 
-            // ── Quick Actions ──
+            // ── Pair Hub quick action ──
             OutlinedButton(
                 onClick = onPairHub,
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                shape = MaterialTheme.shapes.small
+                shape = MaterialTheme.shapes.medium
             ) {
-                Text("Pair Hub")
+                Text("+ Pair Hub", style = MaterialTheme.typography.labelLarge)
             }
 
             Spacer(modifier = Modifier.height(4.dp))
@@ -182,7 +186,8 @@ fun ApproverTasksHomeScreen(
                 }
             }
 
-            // ── Task List with swipe-to-delete ──
+            // ── Task List ──
+            KiluSectionHeader(label = "Tasks")
             if (isLoading) {
                 Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
@@ -245,35 +250,4 @@ fun ApproverTasksHomeScreen(
     }
 }
 
-@Composable
-fun StatCard(
-    label: String,
-    value: String,
-    color: androidx.compose.ui.graphics.Color,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(
-            containerColor = color.copy(alpha = 0.1f)
-        ),
-        shape = MaterialTheme.shapes.small
-    ) {
-        Column(
-            modifier = Modifier.padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = color
-            )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
 }
