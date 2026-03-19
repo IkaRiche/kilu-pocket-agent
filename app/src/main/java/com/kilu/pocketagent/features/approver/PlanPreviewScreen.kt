@@ -32,6 +32,7 @@ fun PlanPreviewScreen(
     val context = LocalContext.current
     var planData by remember { mutableStateOf<PlanPreviewResp?>(null) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
+    var bindingWarning by remember { mutableStateOf<String?>(null) }
     var isApproving by remember { mutableStateOf(false) }
     
     val scope = rememberCoroutineScope()
@@ -44,12 +45,13 @@ fun PlanPreviewScreen(
             val controlPlane = ControlPlaneApi(apiClient.client, apiClient.apiUrl(""))
             val plan = controlPlane.getPlan(taskId)
             if (plan != null) {
-                // Check if binding is present (mandatory for Phase 9A)
+                // Note: runtime_id/toolchain_id may be null if no Hub is paired yet.
+                // This is a UX warning only — real authority binding is enforced
+                // server-side during mint-step-batch (ERR_GRANT_NOT_ACTIVE etc).
                 if (plan.runtime_id == null || plan.toolchain_id == null) {
-                    errorMsg = "Critical Error: Task authority binding is incomplete (missing runtime/toolchain)."
-                } else {
-                    planData = plan
+                    bindingWarning = "Hub runtime not yet bound. Approval will be recorded but execution requires a paired Hub."
                 }
+                planData = plan
             } else {
                 errorMsg = "Failed to fetch plan."
             }
@@ -137,24 +139,38 @@ fun PlanPreviewScreen(
             }
 
             if (planData != null) {
-                // 1. Authority Binding Section (MANDATORY)
+                // Binding warning (not a blocker — real check is server-side)
+                if (bindingWarning != null) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                    ) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text("⚠️ Hub Not Bound", style = MaterialTheme.typography.titleSmall)
+                            Text(bindingWarning!!, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+                // 1. Authority Binding Section
                 Text("Authority Binding", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
                 Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                     Column(Modifier.padding(12.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("Hub Name", style = MaterialTheme.typography.labelSmall)
-                            Text(planData!!.hub_name ?: "Unknown", style = MaterialTheme.typography.bodySmall)
+                            Text(planData!!.hub_name ?: "Unbound", style = MaterialTheme.typography.bodySmall)
                         }
                         Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("Runtime ID", style = MaterialTheme.typography.labelSmall)
-                            Text(planData!!.runtime_id?.take(12) ?: "N/A", style = MaterialTheme.typography.bodySmall)
+                            Text(planData!!.runtime_id?.take(12) ?: "—", style = MaterialTheme.typography.bodySmall)
                         }
                         Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("Toolchain", style = MaterialTheme.typography.labelSmall)
-                            Text(planData!!.toolchain_id ?: "N/A", style = MaterialTheme.typography.bodySmall)
+                            Text(planData!!.toolchain_id ?: "—", style = MaterialTheme.typography.bodySmall)
                         }
                         Divider(Modifier.padding(vertical = 8.dp))
-                        Text("Binding Integrity: VERIFIED", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+                        val bindingStatus = if (planData!!.runtime_id != null && planData!!.toolchain_id != null) "VERIFIED" else "UNBOUND"
+                        Text("Binding Integrity: $bindingStatus", style = MaterialTheme.typography.labelSmall,
+                            color = if (bindingStatus == "VERIFIED") MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error)
                     }
                 }
 

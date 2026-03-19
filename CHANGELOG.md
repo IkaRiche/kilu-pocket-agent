@@ -2,6 +2,11 @@
 
 All notable changes to KiLu Pocket Agent.
 
+## [0.9.1] — 2026-03-19
+
+### Fixed
+- **PlanPreviewScreen blocking error** — `Task authority binding is incomplete (missing runtime/toolchain)` was a blocking error that prevented plan approval when no Hub runtime was bound to the task. Downgraded to a soft yellow warning card. Real authority binding enforcement remains server-side (mint-step-batch). Binding Integrity label now shows `VERIFIED` or `UNBOUND` correctly instead of always `VERIFIED`.
+
 ## [0.9.0] — 2026-03-19
 
 ### Fixed
