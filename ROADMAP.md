@@ -1,22 +1,45 @@
-# Roadmap
+# Roadmap — kilu-pocket-agent
 
-## Phase 0: The Skeleton (Current)
-- [x] Dual-node architecture (Approver/Hub)
-- [x] Device pairing via QR
-- [x] Base cryptographic signatures (Ed25519)
-- [x] WebView extraction sandbox
+## Current Version: v0.9.5
 
-## Phase 1: Fail-Closed Enforcements (v0.x)
+## Shipped
+
+| Version | What | Status |
+|---|---|---|
+| **v0.x** | Dual-node (Approver/Hub), QR pairing, Ed25519, WebView sandbox | ✅ Done |
+| **v0.9.3** | Window insets / edge-to-edge baseline across all screens | ✅ Done |
+| **v0.9.4** | CI compile fix (`windowInsets`→`contentWindowInsets`, stray brace) | ✅ Done |
+| **v0.9.5** | Hub task routing fix (heartbeat, eligible-runtime selection, auto-bind, getTask parsing) | ✅ Done |
+
+## Phase 1: Hub Routing & Presence (v0.9.5)
+
+- [x] `HubRuntimeLoop`: `registerRuntime()` on startup + 5-min heartbeat → `hub_runtimes.status=ONLINE`
+- [x] `DeviceProfileStore`: `getRuntimeId()` / `getToolchainId()` persisted at pairing
+- [x] `HubOfferDetailsScreen`: save `runtime_id` + `toolchain_id` from confirm response
+- [x] `ControlPlaneApi.getTask()`: parse bare object (not `Map["task"]` envelope)
+- [x] `ControlPlaneApi.registerRuntime()`: new heartbeat method
+
+## Phase 2: UI / Design Hardening (v0.9.6)
+
+- [ ] Hub Dashboard: KiluStatBadge, proper empty state, queue count indicator
+- [ ] Diagnostics screens: dark background, KiluCard layout
+- [ ] Apply `KiluPrimaryButton` + `KiluTopBar` to remaining screens
+- [ ] `navigationBarsPadding()` verified on all bottom action screens
+
+## Phase 3: Fail-Closed Enforcements (v1.0)
+
 - [ ] Strict execution boundary enforcement
 - [ ] Reproducible benchmark suite
-- [ ] Capability token expiry (JTI)
+- [ ] Capability token expiry (JTI) on Android
 
-## Phase 2: Local AI (v1.x)
+## Phase 4: Local AI
+
 - [ ] Local LLM provider interface for compression/planning
-- [ ] Support for running entirely without paid Cloud API keys
+- [ ] Support for entirely cloud-key-free operation
 - [ ] Open-source self-hosted Control Plane drops
 
-## Phase 3: Enterprise 
-- [ ] SIEM (Security Information and Event Management) Webhooks
-- [ ] KMS Integration for external signing operations
+## Phase 5: Enterprise
+
+- [ ] SIEM Webhooks
+- [ ] KMS Integration for external signing
 - [ ] ISO Compliance mapping templates
