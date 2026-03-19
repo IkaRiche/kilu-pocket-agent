@@ -47,6 +47,30 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
 
     suspend fun startLoop(isActive: () -> Boolean) {
         Log.d("HubRuntimeLoop", "Loop Started")
+
+        // Fix 1: Register runtime on startup to ensure hub_runtimes.status=ONLINE
+        // and last_seen_at is fresh. Required for eligible-runtime selection at task creation.
+        val runtimeId = apiClient.store.getRuntimeId()
+        val toolchainId = apiClient.store.getToolchainId()
+        if (runtimeId != null && toolchainId != null) {
+            val ok = controlPlane.registerRuntime(runtimeId, toolchainId)
+            Log.d("HubRuntimeLoop", "Startup registerRuntime ok=$ok runtime=$runtimeId")
+        } else {
+            Log.w("HubRuntimeLoop", "runtime_id/toolchain_id missing from store — re-pair Hub to fix routing")
+        }
+
+        // Heartbeat: refresh presence every 5 minutes while loop is active
+        val heartbeatScope = CoroutineScope(Dispatchers.IO)
+        val heartbeatJob = heartbeatScope.launch {
+            while (isActive()) {
+                delay(5 * 60 * 1000L)
+                if (runtimeId != null && toolchainId != null) {
+                    val ok = controlPlane.registerRuntime(runtimeId, toolchainId)
+                    Log.d("HubRuntimeLoop", "Periodic registerRuntime ok=$ok")
+                }
+            }
+        }
+
         while (isActive()) {
             try {
                 if (apiClient.store.getSessionToken() == null) {
@@ -96,8 +120,10 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
                 delay(backoffPolicy.getDelayMs(BackoffState.ERROR_UNKNOWN))
             }
         }
+        heartbeatJob.cancel()
         wakelockGuard.release()
     }
+
 
     private suspend fun executeTask(task: HubQueueResponse, isActive: () -> Boolean) = coroutineScope {
         wakelockGuard.acquire(120_000)

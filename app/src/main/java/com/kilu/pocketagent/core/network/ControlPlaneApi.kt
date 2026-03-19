@@ -344,14 +344,47 @@ class ControlPlaneApi(
                 when {
                     resp.isSuccessful -> {
                         val body = resp.body?.string() ?: ""
-                        // The server returns { "task": { ... } }
-                        val wrapper = json.decodeFromString<Map<String, ApproverTaskItem>>(body)
-                        wrapper["task"]
+                        // Server returns bare ApproverTaskItem (not an envelope)
+                        json.decodeFromString<ApproverTaskItem>(body)
                     }
                     else -> null
                 }
             } catch (e: Exception) { null }
         }
+
+    /**
+     * Hub heartbeat — keeps hub_runtimes.status=ONLINE and last_seen_at fresh.
+     * Called once at loop startup and every 5 min thereafter.
+     * Returns false on auth failure (caller should handle session expiry).
+     */
+    suspend fun registerRuntime(runtimeId: String, toolchainId: String): Boolean =
+        withContext(Dispatchers.IO) {
+            try {
+                val body = """{"runtime_id":"$runtimeId","toolchain_id":"$toolchainId"}"""
+                    .toRequestBody(mediaTypeJson)
+                val req = Request.Builder()
+                    .url("$baseUrl/runtimes/register")
+                    .post(body)
+                    .build()
+                val resp = client.newCall(req).execute()
+                when {
+                    resp.isSuccessful -> true
+                    resp.code == 401 || resp.code == 403 -> {
+                        logger.e("ControlPlaneApi", "registerRuntime auth error ${resp.code}")
+                        onAuthFailure?.invoke()
+                        false
+                    }
+                    else -> {
+                        logger.e("ControlPlaneApi", "registerRuntime http=${resp.code}")
+                        false
+                    }
+                }
+            } catch (e: Exception) {
+                logger.e("ControlPlaneApi", "registerRuntime error", e)
+                false
+            }
+        }
+
 
     suspend fun cancelTask(taskId: String): Boolean =
         withContext(Dispatchers.IO) {

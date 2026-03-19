@@ -48,11 +48,20 @@ class DeviceProfileStore(private val context: Context) {
     fun getKeyAlias(): String = prefs.getString("keyAlias", "kilu_default_key")!!
     fun setKeyAlias(alias: String) = prefs.edit().putString("keyAlias", alias).apply()
 
+    fun getRuntimeId(): String? = prefs.getString("runtimeId", null)
+    fun setRuntimeId(id: String) = prefs.edit().putString("runtimeId", id).apply()
+
+    fun getToolchainId(): String? = prefs.getString("toolchainId", null)
+    fun setToolchainId(id: String) = prefs.edit().putString("toolchainId", id).apply()
+
     fun clearPairing() {
         prefs.edit()
             .remove("deviceId")
             .remove("tenantId")
             .remove("sessionToken")
+            .remove("runtimeId")
+            .remove("toolchainId")
             .apply()
     }
 }
+

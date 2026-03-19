@@ -102,7 +102,10 @@ fun HubOfferDetailsScreen(
                             store.setDeviceId(data.device_id)
                             store.setTenantId(data.tenant_id)
                             store.setSessionToken(data.hub_session_token)
+                            store.setRuntimeId(data.runtime_id)
+                            store.setToolchainId(data.toolchain_id)
                             onPaired()
+
                         } else {
                             errorMsg = com.kilu.pocketagent.shared.utils.ErrorHandler.parseError(resp)
                         }
