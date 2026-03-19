@@ -12,6 +12,7 @@ import org.junit.Before
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /**
  * Negative / malformed response tests.
@@ -110,8 +111,8 @@ class MalformedResponseTest {
             approval_receipt = ApprovalReceipt("ED25519", "pub", "sig")
         ))
 
-        // Should return null, not throw
-        assertEquals(null, result, "HTML body should result in null, not crash")
+        // Should return failure, not throw
+        assertTrue(result.isFailure, "HTML body on 200 should result in failure, not crash")
     }
 
     @Test
@@ -124,7 +125,7 @@ class MalformedResponseTest {
             approval_receipt = ApprovalReceipt("ED25519", "pub", "sig")
         ))
 
-        assertEquals(null, result)
+        assertTrue(result.isFailure, "Empty body on 200 should result in failure")
     }
 
     // ── submitResult fail-closed ───────────────────────────────────────────────

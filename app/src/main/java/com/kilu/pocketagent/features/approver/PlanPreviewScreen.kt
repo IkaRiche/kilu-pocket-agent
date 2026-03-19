@@ -118,8 +118,12 @@ fun PlanPreviewScreen(
                                             )
 
                                             val controlPlane = ControlPlaneApi(apiClient.client, apiClient.apiUrl(""))
-                                            val resp = controlPlane.approvePlan(planData!!.plan_id, payload)
-                                            if (resp != null) onApproved() else errorMsg = "Control Plane rejected approval."
+                                            val result = controlPlane.approvePlan(planData!!.plan_id, payload)
+                                            if (result.isSuccess) {
+                                                onApproved()
+                                            } else {
+                                                errorMsg = "Control Plane rejected approval.\n${result.exceptionOrNull()?.message ?: "Unknown error"}"
+                                            }
                                         } catch (e: Exception) {
                                             errorMsg = "Approval failed: ${e.message}"
                                         } finally {

@@ -12,7 +12,6 @@ import org.junit.Before
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -111,9 +110,11 @@ class ApprovePlanContractTest {
 
         val result = api.approvePlan("pln_1", makeReq())
 
-        assertNotNull(result, "Should return ApprovePlanResp on 200")
-        assertEquals("gr_success", result.grant_id)
-        assertEquals("APPROVED", result.status)
+        assertTrue(result.isSuccess, "Should return success on 200")
+        val resp = result.getOrNull()
+        assertNotNull(resp, "ApprovePlanResp must not be null")
+        assertEquals("gr_success", resp.grant_id)
+        assertEquals("APPROVED", resp.status)
     }
 
     // ── Error responses ────────────────────────────────────────────────────────
@@ -126,7 +127,7 @@ class ApprovePlanContractTest {
         )
 
         val result = api.approvePlan("pln_1", makeReq())
-        assertNull(result, "Should return null on 400 (not throw)")
+        assertTrue(result.isFailure, "Should return failure on 400 (not throw)")
     }
 
     @Test
@@ -134,7 +135,7 @@ class ApprovePlanContractTest {
         server.enqueue(MockResponse().setResponseCode(401))
 
         val result = api.approvePlan("pln_1", makeReq())
-        assertNull(result)
+        assertTrue(result.isFailure)
         assertTrue(authFailureCalled, "onAuthFailure must be called on 401")
     }
 
@@ -143,6 +144,6 @@ class ApprovePlanContractTest {
         server.enqueue(MockResponse().setResponseCode(500).setBody("Internal Error"))
 
         val result = api.approvePlan("pln_1", makeReq())
-        assertNull(result, "Must fail-closed and return null on 500")
+        assertTrue(result.isFailure, "Must fail-closed and return failure on 500")
     }
 }

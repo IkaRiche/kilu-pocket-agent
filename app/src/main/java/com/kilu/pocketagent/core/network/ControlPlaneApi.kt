@@ -75,7 +75,12 @@ class ControlPlaneApi(
 
     // ── Plan Approval ──────────────────────────────────────────────────────────
 
-    suspend fun approvePlan(planId: String, req: ApprovePlanReq): ApprovePlanResp? =
+    /**
+     * Approve a plan. Returns Result:
+     *   - success: ApprovePlanResp (grant created)
+     *   - failure: exception message contains server error code/message for display
+     */
+    suspend fun approvePlan(planId: String, req: ApprovePlanReq): Result<ApprovePlanResp> =
         withContext(Dispatchers.IO) {
             try {
                 val body = json.encodeToString(req).toByteArray().toRequestBody(mediaTypeJson)
@@ -84,24 +89,40 @@ class ControlPlaneApi(
                     .post(body)
                     .build()
                 val resp = client.newCall(httpReq).execute()
+                val respBodyStr = resp.body?.string() ?: ""
                 when {
                     resp.isSuccessful -> {
-                        val respBody = resp.body?.string() ?: ""
-                        json.decodeFromString<ApprovePlanResp>(respBody)
+                        Result.success(json.decodeFromString<ApprovePlanResp>(respBodyStr))
                     }
                     resp.code == 401 || resp.code == 403 -> {
                         logger.e("ControlPlaneApi", "approvePlan auth error ${resp.code}")
                         onAuthFailure?.invoke()
-                        null
+                        // Extract code+message from server JSON if possible
+                        val serverCode = try {
+                            val obj = json.parseToJsonElement(respBodyStr)
+                            val err = obj.jsonObject["error"]?.jsonObject
+                            val code = err?.get("code")?.jsonPrimitive?.content ?: "ERR_AUTH"
+                            val msg = err?.get("message")?.jsonPrimitive?.content ?: "Auth error"
+                            "[$code] $msg"
+                        } catch (_: Exception) { "[${resp.code}] Auth error" }
+                        Result.failure(Exception(serverCode))
                     }
                     else -> {
-                        logger.e("ControlPlaneApi", "approvePlan http=${resp.code} body=${resp.body?.string()}")
-                        null
+                        // Extract actual error code and message from server response
+                        val serverError = try {
+                            val obj = json.parseToJsonElement(respBodyStr)
+                            val err = obj.jsonObject["error"]?.jsonObject
+                            val code = err?.get("code")?.jsonPrimitive?.content ?: "ERR_UNKNOWN"
+                            val msg = err?.get("message")?.jsonPrimitive?.content ?: respBodyStr.take(200)
+                            "[$code] $msg"
+                        } catch (_: Exception) { "[HTTP ${resp.code}] $respBodyStr".take(200) }
+                        logger.e("ControlPlaneApi", "approvePlan failed: $serverError")
+                        Result.failure(Exception(serverError))
                     }
                 }
             } catch (e: Exception) {
                 logger.e("ControlPlaneApi", "approvePlan error", e)
-                null
+                Result.failure(e)
             }
         }
 

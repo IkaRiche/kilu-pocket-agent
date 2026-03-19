@@ -12,7 +12,6 @@ import org.junit.Before
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -60,7 +59,7 @@ class ProtocolStateMachineTest {
         server.enqueue(MockResponse().setResponseCode(400).setBody("""{"error":"plan_not_found"}"""))
         
         val result = api.approvePlan("invalid_plan", mockApproveReq())
-        assertNull(result, "Approving an invalid plan must return null (fail-closed)")
+        assertTrue(result.isFailure, "Approving an invalid plan must return failure (fail-closed)")
         val req = server.takeRequest()
         assertTrue(req.path!!.endsWith("/plans/invalid_plan/approve"), "Path consistency check failed")
     }
@@ -168,6 +167,6 @@ class ProtocolStateMachineTest {
         server.enqueue(MockResponse().setResponseCode(200).setBody("""{"status":"error_actually"}"""))
         
         val result = api.approvePlan("pln_abc", mockApproveReq())
-        assertNull(result, "Missing required fields on a 200 response must throw a parser error caught and return null")
+        assertTrue(result.isFailure, "Missing required fields on a 200 response must return failure, not crash")
     }
 }
