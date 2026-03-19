@@ -42,7 +42,7 @@ fun ApproverPairingInitScreen(apiClient: ApiClient, store: DeviceProfileStore, o
     val jsonParser = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     val keyManager = remember { KeyManager(context) }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp).navigationBarsPadding(), horizontalAlignment = Alignment.CenterHorizontally) {
         Text("Register as Approver", style = MaterialTheme.typography.headlineMedium)
         Spacer(modifier = Modifier.height(16.dp))
         

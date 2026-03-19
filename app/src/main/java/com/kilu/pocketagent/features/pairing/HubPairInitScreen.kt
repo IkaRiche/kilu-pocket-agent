@@ -36,7 +36,7 @@ fun HubPairInitScreen(
     val jsonParser = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier.fillMaxSize().padding(16.dp).navigationBarsPadding(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text("Pair a Hub Device", style = MaterialTheme.typography.headlineMedium)
@@ -92,7 +92,10 @@ fun HubPairInitScreen(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(
+            onClick = onBack,
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Text("Done")
         }
     }

@@ -61,6 +61,7 @@ fun PlanPreviewScreen(
     }
 
     Scaffold(
+        windowInsets = WindowInsets(0),
         topBar = {
             Column(Modifier.padding(16.dp)) {
                 Text("Approve Execution", style = MaterialTheme.typography.headlineMedium)
@@ -68,7 +69,10 @@ fun PlanPreviewScreen(
             }
         },
         bottomBar = {
-            Surface(tonalElevation = 8.dp) {
+            Surface(
+                tonalElevation = 8.dp,
+                modifier = Modifier.navigationBarsPadding()
+            ) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)

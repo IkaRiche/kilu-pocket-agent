@@ -18,30 +18,50 @@ fun ControlPlaneUrlScreen(store: DeviceProfileStore, onComplete: () -> Unit) {
         url.startsWith("https://") || url.startsWith("http://")
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("Connect to Control Plane", style = MaterialTheme.typography.headlineMedium)
-        Spacer(modifier = Modifier.height(16.dp))
-        OutlinedTextField(
-            value = url,
-            onValueChange = { url = it },
-            label = { Text("URL") },
-            modifier = Modifier.fillMaxWidth(),
-            isError = !isValid
-        )
-        if (!isValid) {
-            val errMsg = if (BuildConfig.ENFORCE_HTTPS) "Production requires https://" else "Must be https:// or http://"
-            Text(errMsg, color = MaterialTheme.colorScheme.error)
+    Scaffold(
+        windowInsets = WindowInsets(0),
+        bottomBar = {
+            // navigationBarsPadding: button above nav bar
+            // imePadding: URL keyboard pushes button up
+            Surface(
+                tonalElevation = 8.dp,
+                modifier = Modifier.navigationBarsPadding().imePadding()
+            ) {
+                Button(
+                    onClick = {
+                        store.setControlPlaneUrl(url.trimEnd('/'))
+                        onComplete()
+                    },
+                    enabled = isValid,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .height(48.dp)
+                ) {
+                    Text("Connect")
+                }
+            }
         }
-        Spacer(modifier = Modifier.weight(1f))
-        Button(
-            onClick = {
-                store.setControlPlaneUrl(url.trimEnd('/'))
-                onComplete()
-            },
-            enabled = isValid,
-            modifier = Modifier.fillMaxWidth()
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp)
         ) {
-            Text("Connect")
+            Text("Connect to Control Plane", style = MaterialTheme.typography.headlineMedium)
+            Spacer(modifier = Modifier.height(16.dp))
+            OutlinedTextField(
+                value = url,
+                onValueChange = { url = it },
+                label = { Text("URL") },
+                modifier = Modifier.fillMaxWidth(),
+                isError = !isValid
+            )
+            if (!isValid) {
+                val errMsg = if (BuildConfig.ENFORCE_HTTPS) "Production requires https://" else "Must be https:// or http://"
+                Text(errMsg, color = MaterialTheme.colorScheme.error)
+            }
         }
     }
 }

@@ -2,6 +2,17 @@
 
 All notable changes to KiLu Pocket Agent.
 
+## [0.9.2] — 2026-03-19
+
+### Fixed
+- **Phase A: Window Insets / Edge-to-Edge** — `enableEdgeToEdge()` was active but Scaffold bottomBars and bottom-pinned CTAs had no `navigationBarsPadding()`, causing system nav bar to cover buttons on 5 screens:
+  - `NewTaskScreen` — button moved to Scaffold `bottomBar` with `navigationBarsPadding().imePadding()`; content area is now independently scrollable (`verticalScroll`)
+  - `PlanPreviewScreen` — Scaffold `bottomBar` Surface gets `navigationBarsPadding()`
+  - `ControlPlaneUrlScreen` — refactored to Scaffold; button gets `navigationBarsPadding().imePadding()`
+  - `ApproverPairingInitScreen` — outer Column gets `navigationBarsPadding()`
+  - `HubPairInitScreen` — outer Column gets `navigationBarsPadding()`
+- Rule applied: `imePadding()` only on screens with visible text input (NewTask, ControlPlaneUrl); no global insets applied to avoid layout jump issues.
+
 ## [0.9.1] — 2026-03-19
 
 ### Fixed
