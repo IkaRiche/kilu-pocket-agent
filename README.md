@@ -10,7 +10,7 @@ A split-trust mobile agent where **the cloud can think**, but **the phone can on
 
 ---
 
-## Current Status — Phase 10A ✅
+## Current Status — Phase 10B ✅
 
 This app is the **Android Approver + Hub** client for the KiLu Network.
 
@@ -23,12 +23,18 @@ This app is the **Android Approver + Hub** client for the KiLu Network.
 | Hub task queue polling | ✅ Live (Phase 10A: runtime-bound + grant-gated) |
 | Step token minting via `mint-step-batch` | ✅ Live |
 | Device list screen | ✅ Live |
+| **Bug fixed**: `ApiClient.apiUrl('')` trailing slash | ✅ Fixed (commit `75e955f`) |
 
-**Backend:** [KiLu-Network](https://github.com/IkaRiche/KiLu-Network) — Cloud CP commit `3728d28` (31/31 tests green).
+**Bug note:** All `GET /v1/devices`, `GET /v1/tasks`, `GET /v1/hub/queue` calls were returning 404
+because `apiUrl('')` produced a trailing slash → double-slash URL (`/v1//devices`).
+Fixed in `ApiClient.kt` — one-liner, all 10+ call sites covered.
 
-### Coming in Phase 10B
-- Telegram Bot as conversational ingress (`telegram-bot/` in KiLu-Network)
-- Android Approver remains the **only authority device** — Telegram does not approve tasks
+**Backend:** [KiLu-Network](https://github.com/IkaRiche/KiLu-Network) — Cloud CP + Telegram Bot, Phase 10B complete.
+
+### Coming in Phase 10C
+- Real-time push notifications (FCM) for plan approval events
+- DeerFlow as planning layer behind Telegram Bot
+- Telegram → DeerFlow plan → KiLu approval → Hub execution
 
 ---
 
