@@ -2,6 +2,14 @@
 
 All notable changes to KiLu Pocket Agent.
 
+## [0.9.0] — 2026-03-19
+
+### Fixed
+- **Critical: ApiClient.apiUrl() trailing slash** — `apiUrl('')` returned `host/v1/` with trailing slash, causing all `ControlPlaneApi` call sites to produce double-slash URLs (`/v1//devices`, `/v1//tasks`, `/v1//hub/queue`) → Cloudflare Worker returned 404 for every API call. Fixed: empty path now returns `host/v1` (no trailing slash). Fixes "Failed to load tasks." and "Failed to load devices." in production.
+
+### Changed
+- README updated to Phase 10B status with Android fix note and Phase 10C roadmap
+
 ## [0.8.7] — 2026-03-06
 
 ### Fixed
