@@ -12,8 +12,8 @@ android {
         applicationId = "com.kilu.pocketagent"
         minSdk = 26
         targetSdk = 34
-        versionCode = 102
-        versionName = "0.9.12"
+        versionCode = 103
+        versionName = "0.9.13"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -107,6 +107,7 @@ dependencies {
     implementation("androidx.biometric:biometric:1.2.0-alpha05")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("org.jsoup:jsoup:1.17.2")
     
     // Crypto
     implementation("org.bouncycastle:bcprov-jdk15to18:1.77")

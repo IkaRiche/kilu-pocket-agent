@@ -7,8 +7,7 @@ import android.util.Log
 
 // ... existing imports ...
 import com.kilu.pocketagent.core.crypto.DigestUtil
-import com.kilu.pocketagent.core.hub.web.WebExtractScripts
-import com.kilu.pocketagent.core.hub.web.WebViewExecutor
+import com.kilu.pocketagent.core.hub.web.HtmlFetcher
 import com.kilu.pocketagent.core.network.ApiClient
 import com.kilu.pocketagent.shared.models.*
 import kotlinx.coroutines.*
@@ -130,7 +129,7 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
         runHistory.add(System.currentTimeMillis())
         
         var heartbeatJob: Job? = null
-        var executor: WebViewExecutor? = null
+        val htmlFetcher = HtmlFetcher()
         try {
             // Heartbeat
             heartbeatJob = launch(Dispatchers.IO) {
@@ -167,61 +166,52 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
                 return@coroutineScope
             }
 
-            // WebView
-            executor = WebViewExecutor(context)
-            executor.initialize()
-            val loadRes = executor.loadUrl(task.external_url ?: "", 15000, 5000)
-            val loadErr = loadRes.exceptionOrNull()?.message ?: "Load failed"
-            if (loadRes.isFailure) {
-                // HTTP error or timeout: submit FAILED result so task reaches terminal DONE state
+            // Fetch & extract via OkHttp + Jsoup (no WebView, no Main thread)
+            val fetchResult = htmlFetcher.fetchAndExtract(task.external_url ?: "")
+
+            if (fetchResult.error != null && fetchResult.error == "PAYWALL_DETECTED") {
+                handleEscalation(task.task_id, "paywall", "Paywall detected by HtmlFetcher")
+                return@coroutineScope
+            }
+
+            if (fetchResult.error != null || fetchResult.statusCode >= 400) {
+                // HTTP error or network failure: submit FAILED result → terminal DONE
                 val finishedTime = java.time.Instant.now().toString()
                 val evidence = Evidence(
                     task_id = task.task_id,
                     step_id = stepId,
                     runner_id = runtimeId,
-                    adapter = "webview",
+                    adapter = "okhttp",
                     outcome = "failed",
                     started_at = startTime,
                     finished_at = finishedTime,
-                    stdout_hash = "sha256:" + DigestUtil.sha256Hex(loadErr),
-                    exit_code = 1
+                    stdout_hash = "sha256:" + DigestUtil.sha256Hex(fetchResult.error ?: "http_error"),
+                    exit_code = if (fetchResult.statusCode >= 400) fetchResult.statusCode else 1
                 )
                 controlPlane.submitResult(task.task_id, SubmitResultReq(evidence))
-                transition(BackoffState.IDLE, "Submit failed result for ${task.task_id.take(8)}: $loadErr")
+                transition(BackoffState.IDLE, "Submit failed(${fetchResult.statusCode}) for ${task.task_id.take(8)}")
                 return@coroutineScope
             }
 
-            val heuristics = executor.evaluateJavascript(WebExtractScripts.CHECK_HEURISTICS, 3000)
-            if (heuristics.isNotEmpty() && heuristics != "null" && heuristics.isNotBlank()) {
-                // True security block: escalate to human (paywall/subscribe only)
-                handleEscalation(task.task_id, "security_heuristic", heuristics)
-                return@coroutineScope
-            }
+            val safeText = fetchResult.paragraphs.trim()
+            val parsedHeadings = fetchResult.headings
 
-            val paragraphs = executor.evaluateJavascript(WebExtractScripts.EXTRACT_PARAGRAPHS, 3000)
-            val rawHeadingsStr = executor.evaluateJavascript(WebExtractScripts.EXTRACT_HEADINGS, 3000)
-            val parsedHeadings = try {
-                jsonParser.decodeFromString<List<String>>(rawHeadingsStr)
-            } catch (_: Exception) { emptyList() }
-            
-            val safeText = paragraphs.replace("\\n", "\n").replace("\\\"", "\"").trim()
-
-            if (safeText.length < 200 && parsedHeadings.isEmpty()) {
-                // Empty DOM: submit failed result (not a human decision, just no content)
+            if (safeText.length < 100 && parsedHeadings.isEmpty()) {
+                // Empty content: submit failed → terminal DONE
                 val finishedTime = java.time.Instant.now().toString()
                 val evidence = Evidence(
                     task_id = task.task_id,
                     step_id = stepId,
                     runner_id = runtimeId,
-                    adapter = "webview",
+                    adapter = "okhttp",
                     outcome = "failed",
                     started_at = startTime,
                     finished_at = finishedTime,
-                    stdout_hash = "sha256:" + DigestUtil.sha256Hex("extraction_blocked"),
+                    stdout_hash = "sha256:" + DigestUtil.sha256Hex("empty_content"),
                     exit_code = 2
                 )
                 controlPlane.submitResult(task.task_id, SubmitResultReq(evidence))
-                transition(BackoffState.IDLE, "Submit empty-DOM result for ${task.task_id.take(8)}")
+                transition(BackoffState.IDLE, "Submit empty-content result for ${task.task_id.take(8)}")
                 return@coroutineScope
             }
 
@@ -234,7 +224,7 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
                 "headings_hash" to JsonPrimitive("sha256:$headingsHashHex")
             ))
 
-            val autoSummary = "Successfully extracted ${safeText.length} characters and ${parsedHeadings.size} headings from ${task.external_url} via Headless Edge WebView execution."
+            val autoSummary = "Successfully extracted ${safeText.length} characters and ${parsedHeadings.size} headings from ${task.external_url} via OkHttp/Jsoup edge execution."
             val facts = parsedHeadings.take(5).map { "Heading Extracted: $it" }
 
             val finishedTime = java.time.Instant.now().toString()
@@ -242,7 +232,7 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
                 task_id = task.task_id,
                 step_id = stepId,
                 runner_id = runtimeId,
-                adapter = "webview",
+                adapter = "okhttp",
                 outcome = "success",
                 started_at = startTime,
                 finished_at = finishedTime,
@@ -264,7 +254,6 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
             }
 
         } finally {
-            executor?.destroy()
             heartbeatJob?.cancel()
             wakelockGuard.release()
         }
