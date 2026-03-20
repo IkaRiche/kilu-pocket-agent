@@ -105,11 +105,8 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
                 }
                 
                 val task = tasks.first()
-                if (assumptionsPrefs.getBoolean("esc_${task.task_id}", false)) {
-                    transition(BackoffState.WAITING_APPROVER, "Waiting for Approver resolution on task ${task.task_id.take(8)}")
-                    delay(backoffPolicy.getDelayMs(BackoffState.WAITING_APPROVER))
-                    continue
-                }
+                // Skip esc_ stale flag check — failed tasks are now submitted with outcome='failed'
+                // and reach terminal DONE state on the server, so they drop from the queue naturally.
                 
                 // LEASED -> RUNNING
                 executeTask(task, isActive)
@@ -173,15 +170,30 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
             // WebView
             executor = WebViewExecutor(context)
             executor.initialize()
-            
             val loadRes = executor.loadUrl(task.external_url ?: "", 15000, 5000)
+            val loadErr = loadRes.exceptionOrNull()?.message ?: "Load failed"
             if (loadRes.isFailure) {
-                handleEscalation(task.task_id, "page_load_failed", "Load failed natively")
+                // HTTP error or timeout: submit FAILED result so task reaches terminal DONE state
+                val finishedTime = java.time.Instant.now().toString()
+                val evidence = Evidence(
+                    task_id = task.task_id,
+                    step_id = stepId,
+                    runner_id = runtimeId,
+                    adapter = "webview",
+                    outcome = "failed",
+                    started_at = startTime,
+                    finished_at = finishedTime,
+                    stdout_hash = "sha256:" + DigestUtil.sha256Hex(loadErr),
+                    exit_code = 1
+                )
+                controlPlane.submitResult(task.task_id, SubmitResultReq(evidence))
+                transition(BackoffState.IDLE, "Submit failed result for ${task.task_id.take(8)}: $loadErr")
                 return@coroutineScope
             }
 
             val heuristics = executor.evaluateJavascript(WebExtractScripts.CHECK_HEURISTICS, 3000)
             if (heuristics.isNotEmpty() && heuristics != "null" && heuristics.isNotBlank()) {
+                // True security block: escalate to human (paywall/subscribe only)
                 handleEscalation(task.task_id, "security_heuristic", heuristics)
                 return@coroutineScope
             }
@@ -195,7 +207,21 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
             val safeText = paragraphs.replace("\\n", "\n").replace("\\\"", "\"").trim()
 
             if (safeText.length < 200 && parsedHeadings.isEmpty()) {
-                handleEscalation(task.task_id, "extraction_blocked", "DOM loaded but no meaningful content.")
+                // Empty DOM: submit failed result (not a human decision, just no content)
+                val finishedTime = java.time.Instant.now().toString()
+                val evidence = Evidence(
+                    task_id = task.task_id,
+                    step_id = stepId,
+                    runner_id = runtimeId,
+                    adapter = "webview",
+                    outcome = "failed",
+                    started_at = startTime,
+                    finished_at = finishedTime,
+                    stdout_hash = "sha256:" + DigestUtil.sha256Hex("extraction_blocked"),
+                    exit_code = 2
+                )
+                controlPlane.submitResult(task.task_id, SubmitResultReq(evidence))
+                transition(BackoffState.IDLE, "Submit empty-DOM result for ${task.task_id.take(8)}")
                 return@coroutineScope
             }
 
