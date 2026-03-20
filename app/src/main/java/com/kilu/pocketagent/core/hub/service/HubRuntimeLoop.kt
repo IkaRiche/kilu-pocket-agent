@@ -174,7 +174,8 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
                     htmlFetcher.fetchAndExtract(task.external_url ?: "")
                 }
             } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-                // Timeout fired — submit FAILED result and exit
+                // Timeout fired — kill OkHttp connection, submit FAILED result and exit
+                htmlFetcher.cancelAll()
                 val finishedTime = java.time.Instant.now().toString()
                 val evidence = Evidence(
                     task_id = task.task_id, step_id = stepId, runner_id = runtimeId,
