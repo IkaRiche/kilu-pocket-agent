@@ -19,6 +19,7 @@ data class CreateTaskReq(
     val title: String,
     val user_prompt: String,
     val executor_preference: String = "HUB_PREFERRED",
+    val target_runtime_id: String? = null,  // 10E: explicit hub binding; null = server chooses
     val skill_id: String? = null,
     val inputs: Map<String, String>? = null
 )
@@ -27,7 +28,26 @@ data class CreateTaskReq(
 data class CreateTaskResp(
     val task_id: String,
     val status: String,
+    val target_runtime_id: String? = null,  // 10E: hub that was auto-selected or explicitly bound
     val version: Int = 0
+)
+
+/**
+ * Enriched device item from GET /v1/devices.
+ * Hub devices include runtime_id and related fields for explicit hub selection.
+ */
+@Serializable
+data class HubDevice(
+    val device_id: String,
+    val device_type: String,
+    val display_name: String,
+    val status: String,
+    val last_seen_at: String? = null,
+    // Hub runtime fields (null for APPROVER devices)
+    val runtime_id: String? = null,
+    val toolchain_id: String? = null,
+    val runtime_status: String? = null,
+    val runtime_last_seen: String? = null
 )
 
 @Serializable

@@ -484,7 +484,7 @@ class ControlPlaneApi(
             }
         }
 
-    suspend fun getDevices(): List<DeviceInfo>? =
+    suspend fun getDevices(): List<HubDevice>? =
         withContext(Dispatchers.IO) {
             try {
                 val req = Request.Builder().url("$baseUrl/devices").get().build()
@@ -492,7 +492,7 @@ class ControlPlaneApi(
                 when {
                     resp.isSuccessful -> {
                         val body = resp.body?.string() ?: "[]"
-                        json.decodeFromString<List<DeviceInfo>>(body)
+                        json.decodeFromString<List<HubDevice>>(body)
                     }
                     resp.code == 401 || resp.code == 403 -> {
                         logger.e("ControlPlaneApi", "getDevices auth error ${resp.code}")
@@ -503,4 +503,5 @@ class ControlPlaneApi(
                 }
             } catch (e: Exception) { null }
         }
+
 }

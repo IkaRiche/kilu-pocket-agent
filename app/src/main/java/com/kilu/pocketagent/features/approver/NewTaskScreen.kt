@@ -3,21 +3,17 @@ package com.kilu.pocketagent.features.approver
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.kilu.pocketagent.core.network.ApiClient
+import com.kilu.pocketagent.core.network.ControlPlaneApi
 import com.kilu.pocketagent.shared.models.CreateTaskReq
-import com.kilu.pocketagent.shared.models.CreateTaskResp
-import com.kilu.pocketagent.shared.utils.ErrorHandler
+import com.kilu.pocketagent.shared.models.HubDevice
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
-import com.kilu.pocketagent.core.network.ControlPlaneApi
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,10 +23,32 @@ fun NewTaskScreen(apiClient: ApiClient, onCreated: (String) -> Unit, onCancel: (
     var urlInput by remember { mutableStateOf("") }
     var isSubmitting by remember { mutableStateOf(false) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
-    
-    val scope = rememberCoroutineScope()
 
+    // ── 10E: Hub selection state ────────────────────────────────────────────
+    var availableHubs by remember { mutableStateOf<List<HubDevice>>(emptyList()) }
+    var selectedHub by remember { mutableStateOf<HubDevice?>(null) }
+    var hubDropdownExpanded by remember { mutableStateOf(false) }
+    var hubsLoaded by remember { mutableStateOf(false) }
+
+    val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
+
+    // Load Hub devices on composition
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            val controlPlane = ControlPlaneApi(apiClient.client, apiClient.apiUrl(""))
+            val devices = controlPlane.getDevices()
+            val hubs = devices
+                ?.filter { it.device_type == "HUB" && it.runtime_id != null }
+                ?: emptyList()
+            withContext(Dispatchers.Main) {
+                availableHubs = hubs
+                // Auto-select if exactly 1 hub (mirrors server-side auto-bind)
+                if (hubs.size == 1) selectedHub = hubs[0]
+                hubsLoaded = true
+            }
+        }
+    }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
@@ -43,8 +61,6 @@ fun NewTaskScreen(apiClient: ApiClient, onCreated: (String) -> Unit, onCancel: (
             )
         },
         bottomBar = {
-            // Bottom action area: navigationBarsPadding so nav bar never covers it,
-            // imePadding so the keyboard pushes it up when visible.
             Surface(
                 tonalElevation = 8.dp,
                 modifier = Modifier.navigationBarsPadding().imePadding()
@@ -65,23 +81,19 @@ fun NewTaskScreen(apiClient: ApiClient, onCreated: (String) -> Unit, onCancel: (
                     }
                     Button(
                         onClick = {
-                            if (titleInput.isBlank()) {
-                                errorMsg = "Title is required."
-                                return@Button
-                            }
-                            if (promptInput.isBlank()) {
-                                errorMsg = "Prompt is required."
-                                return@Button
-                            }
+                            if (titleInput.isBlank()) { errorMsg = "Title is required."; return@Button }
+                            if (promptInput.isBlank()) { errorMsg = "Prompt is required."; return@Button }
                             isSubmitting = true
                             errorMsg = null
                             scope.launch {
                                 try {
-                                    val inputs = if (urlInput.isNotBlank()) mapOf("base_url" to urlInput.trim()) else null
+                                    val inputs = if (urlInput.isNotBlank())
+                                        mapOf("base_url" to urlInput.trim()) else null
                                     val reqPayload = CreateTaskReq(
                                         title = titleInput.trim(),
                                         user_prompt = promptInput.trim(),
                                         executor_preference = "HUB_PREFERRED",
+                                        target_runtime_id = selectedHub?.runtime_id,  // 10E: explicit or null
                                         inputs = inputs
                                     )
                                     val controlPlane = ControlPlaneApi(apiClient.client, apiClient.apiUrl(""))
@@ -145,7 +157,7 @@ fun NewTaskScreen(apiClient: ApiClient, onCreated: (String) -> Unit, onCancel: (
             )
             Spacer(modifier = Modifier.height(12.dp))
 
-            // URL (optional, goes into inputs.base_url)
+            // URL (optional)
             OutlinedTextField(
                 value = urlInput,
                 onValueChange = { urlInput = it },
@@ -157,11 +169,117 @@ fun NewTaskScreen(apiClient: ApiClient, onCreated: (String) -> Unit, onCancel: (
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // ── 10E: Hub selector ───────────────────────────────────────────
+            // Show hub binding info or selector depending on how many hubs are available.
+            if (hubsLoaded) {
+                when {
+                    availableHubs.isEmpty() -> {
+                        // No hubs — task submitted without explicit binding
+                        Text(
+                            "No Hub currently available",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    availableHubs.size == 1 -> {
+                        // Single hub — auto-bind, show as static label (mirrors server behaviour)
+                        Text(
+                            "Hub: ${availableHubs[0].display_name}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        availableHubs[0].runtime_id?.let { rtId ->
+                            Text(
+                                "Runtime: $rtId",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
+                    }
+                    else -> {
+                        // Multiple hubs — show selector (explicit selection required for HUB_ONLY tasks)
+                        Text(
+                            "Select execution hub",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        ExposedDropdownMenuBox(
+                            expanded = hubDropdownExpanded,
+                            onExpandedChange = { hubDropdownExpanded = !hubDropdownExpanded }
+                        ) {
+                            OutlinedTextField(
+                                value = selectedHub?.let {
+                                    "${it.display_name}  ·  ${it.runtime_id}"
+                                } ?: "Auto-select (most recent eligible hub)",
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("Hub") },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = hubDropdownExpanded) },
+                                modifier = Modifier.fillMaxWidth().menuAnchor()
+                            )
+                            ExposedDropdownMenu(
+                                expanded = hubDropdownExpanded,
+                                onDismissRequest = { hubDropdownExpanded = false }
+                            ) {
+                                // "Auto" option — let server pick
+                                DropdownMenuItem(
+                                    text = {
+                                        Column {
+                                            Text("Auto-select", style = MaterialTheme.typography.bodyMedium)
+                                            Text(
+                                                "Server picks most recently active hub",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.outline
+                                            )
+                                        }
+                                    },
+                                    onClick = {
+                                        selectedHub = null
+                                        hubDropdownExpanded = false
+                                    }
+                                )
+                                HorizontalDivider()
+                                availableHubs.forEach { hub ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Column {
+                                                Text(hub.display_name, style = MaterialTheme.typography.bodyMedium)
+                                                Text(
+                                                    "${hub.runtime_id}  ·  ${hub.runtime_status ?: "unknown"}",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.outline
+                                                )
+                                            }
+                                        },
+                                        onClick = {
+                                            selectedHub = hub
+                                            hubDropdownExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        // Show auto-selected info if nothing explicitly chosen
+                        if (selectedHub == null) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                "For HUB_ONLY tasks, you must select a hub explicitly.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             // Quick templates
             Text("Quick templates:", style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             val templates = listOf(
                 Triple("Collect & Report", "Navigate to the URL and extract the main content. Summarize key information.", "https://en.wikipedia.org/wiki/Headless_browser"),
                 Triple("Check Pricing", "Find the pricing page and extract all plan names, prices, and features.", "https://example.com"),
