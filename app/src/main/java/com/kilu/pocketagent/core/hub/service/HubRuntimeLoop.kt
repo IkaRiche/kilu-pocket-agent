@@ -195,6 +195,7 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
 
             val safeText = fetchResult.paragraphs.trim()
             val parsedHeadings = fetchResult.headings
+            val finalUrl = fetchResult.finalUrl  // canonical URL after redirects
 
             if (safeText.length < 100 && parsedHeadings.isEmpty()) {
                 // Empty content: submit failed → terminal DONE
@@ -224,7 +225,7 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
                 "headings_hash" to JsonPrimitive("sha256:$headingsHashHex")
             ))
 
-            val autoSummary = "Successfully extracted ${safeText.length} characters and ${parsedHeadings.size} headings from ${task.external_url} via OkHttp/Jsoup edge execution."
+            val autoSummary = "Fetched ${safeText.length} chars, ${parsedHeadings.size} headings from $finalUrl (requested: ${task.external_url}). Adapter: bounded OkHttp+Jsoup static HTML retrieval (no JS rendering)."
             val facts = parsedHeadings.take(5).map { "Heading Extracted: $it" }
 
             val finishedTime = java.time.Instant.now().toString()
