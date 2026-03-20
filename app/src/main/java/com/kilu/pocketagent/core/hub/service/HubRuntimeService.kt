@@ -40,7 +40,9 @@ class HubRuntimeService : LifecycleService() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
         
-        when (intent?.action) {
+        // null intent = Android restarted the service after reboot (START_STICKY)
+        // In that case treat it the same as ACTION_START
+        when (intent?.action ?: ACTION_START) {
             ACTION_START -> startService()
             ACTION_STOP -> stopService()
             ACTION_PAUSE -> pauseService()

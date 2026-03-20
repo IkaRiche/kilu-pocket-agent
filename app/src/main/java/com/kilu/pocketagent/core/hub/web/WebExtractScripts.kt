@@ -61,7 +61,7 @@ object WebExtractScripts {
                 return "Found active CAPTCHA widget";
             }
             
-            let dangerousKeywords = ["paywall", "subscribe", "login", "auth"];
+            let dangerousKeywords = ["paywall", "subscribe"];
             // We check body classes/ids or prominent structural nodes to not over-trigger on normal text.
             let elements = document.querySelectorAll('body, header, nav, div[id], div[class]');
             for (let el of elements) {
