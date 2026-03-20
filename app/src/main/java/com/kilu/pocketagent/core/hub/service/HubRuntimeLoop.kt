@@ -166,8 +166,27 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
                 return@coroutineScope
             }
 
-            // Fetch & extract via OkHttp + Jsoup (no WebView, no Main thread)
-            val fetchResult = htmlFetcher.fetchAndExtract(task.external_url ?: "")
+            // Fetch & extract — with hard global timeout as safety net
+            // OkHttp has 15s readTimeout but on some OEM Android, background threads
+            // can be throttled. withTimeout(30s) guarantees we ALWAYS exit this block.
+            val fetchResult = try {
+                withTimeout(30_000L) {
+                    htmlFetcher.fetchAndExtract(task.external_url ?: "")
+                }
+            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                // Timeout fired — submit FAILED result and exit
+                val finishedTime = java.time.Instant.now().toString()
+                val evidence = Evidence(
+                    task_id = task.task_id, step_id = stepId, runner_id = runtimeId,
+                    adapter = "okhttp", outcome = "failed",
+                    started_at = startTime, finished_at = finishedTime,
+                    stdout_hash = "sha256:" + DigestUtil.sha256Hex("fetch_timeout_30s"),
+                    exit_code = 124
+                )
+                controlPlane.submitResult(task.task_id, SubmitResultReq(evidence))
+                transition(BackoffState.IDLE, "Global 30s timeout on fetch for ${task.task_id.take(8)}")
+                return@coroutineScope
+            }
 
             if (fetchResult.error != null && fetchResult.error == "PAYWALL_DETECTED") {
                 handleEscalation(task.task_id, "paywall", "Paywall detected by HtmlFetcher")
