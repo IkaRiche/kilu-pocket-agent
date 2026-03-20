@@ -24,19 +24,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import com.kilu.pocketagent.core.network.ControlPlaneApi
-
-@Serializable
-data class DeviceInfo(
-    val device_id: String,
-    val device_type: String,
-    val display_name: String,
-    val status: String,
-    val last_seen_at: String? = null,
-    val app_version: String? = null,
-    val created_at: String? = null,
-    val toolchain_id: String? = null,
-    val runtime_status: String? = null
-)
+import com.kilu.pocketagent.shared.models.HubDevice
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,7 +38,7 @@ fun DevicesScreen(
     val isPaired = store.getSessionToken() != null
     val scope = rememberCoroutineScope()
 
-    var devices by remember { mutableStateOf<List<DeviceInfo>>(emptyList()) }
+    var devices by remember { mutableStateOf<List<HubDevice>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
 
@@ -190,7 +178,7 @@ fun DevicesScreen(
 }
 
 @Composable
-private fun DeviceCard(device: DeviceInfo, isCurrentDevice: Boolean, onCopyId: () -> Unit) {
+private fun DeviceCard(device: HubDevice, isCurrentDevice: Boolean, onCopyId: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -277,18 +265,26 @@ private fun DeviceCard(device: DeviceInfo, isCurrentDevice: Boolean, onCopyId: (
                         shape = MaterialTheme.shapes.extraSmall
                     ) {
                         Text(
-                            text = device.toolchain_id,
+                            text = device.toolchain_id!!,
                             modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onTertiaryContainer
                         )
                     }
+                    if (device.runtime_id != null) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "rt: ${device.runtime_id}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     if (device.runtime_status != null) {
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            "Runtime: ${device.runtime_status}",
+                            device.runtime_status!!,
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = if (device.runtime_status == "ONLINE") StatusApproved else StatusFailed
                         )
                     }
                 }
