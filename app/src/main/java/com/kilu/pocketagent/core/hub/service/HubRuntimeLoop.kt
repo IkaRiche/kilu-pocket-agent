@@ -144,8 +144,9 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
             }
 
             // Mint batch checks
-            val runtimeId = apiClient.store.getDeviceId() ?: "android_unknown"
-            val toolchainId = "tc_webview_v1"
+            // Fix: use getRuntimeId() (rt_...) NOT getDeviceId() (dvc_...) — server checks runtime_id matches grant
+            val runtimeId = apiClient.store.getRuntimeId() ?: apiClient.store.getDeviceId() ?: "android_unknown"
+            val toolchainId = apiClient.store.getToolchainId() ?: "tc_android_v1"
             val stepId = "step_0"
             val stepDigest = DigestUtil.sha256Hex(task.external_url ?: "")
             
