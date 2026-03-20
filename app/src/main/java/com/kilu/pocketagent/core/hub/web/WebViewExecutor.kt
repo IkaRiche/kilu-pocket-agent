@@ -76,10 +76,7 @@ class WebViewExecutor(private val context: Context) {
             webView?.webViewClient = object : WebViewClient() {
                 override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                     super.onPageStarted(view, url, favicon)
-                    val lowerUrl = url?.lowercase() ?: ""
-                    if (lowerUrl.contains("login") || lowerUrl.contains("auth")) {
-                        currentHttpError = "URL redirect suggests Auth: $url"
-                    }
+                    // Removed URL-based auth check — too broad (false-positives on normal URLs)
                 }
 
                 override fun onPageFinished(view: WebView?, url: String?) {
@@ -129,13 +126,17 @@ class WebViewExecutor(private val context: Context) {
 
             webView?.loadUrl(url)
 
-            CoroutineScope(Dispatchers.Main).launch {
+            // Fix: use Dispatchers.IO for the timeout — Dispatchers.Main is blocked by the
+            // outer withContext(Main) waiting for this suspend. Using Main here = deadlock.
+            CoroutineScope(Dispatchers.IO).launch {
                 delay(pageLoadTimeoutMs)
-                if (continuation.isActive && !finished) {
+                if (!finished) {
                     finished = true
-                    webView?.stopLoading()
+                    withContext(Dispatchers.Main) { webView?.stopLoading() }
                     state = ExecutionState.FAILED
-                    continuation.resume(Result.failure(Exception("pageLoadTimeout of ${pageLoadTimeoutMs}ms exceeded. Site might be blocked.")))
+                    if (continuation.isActive) {
+                        continuation.resume(Result.failure(Exception("pageLoadTimeout of ${pageLoadTimeoutMs}ms exceeded.")))
+                    }
                 }
             }
         }
