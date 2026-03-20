@@ -4,7 +4,7 @@ import com.kilu.pocketagent.core.utils.AppLogger
 import com.kilu.pocketagent.core.utils.AndroidLogger
 import com.kilu.pocketagent.features.approver.ResolveAssumptionsReq
 import com.kilu.pocketagent.shared.models.*
-import com.kilu.pocketagent.features.approver.DeviceInfo
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
