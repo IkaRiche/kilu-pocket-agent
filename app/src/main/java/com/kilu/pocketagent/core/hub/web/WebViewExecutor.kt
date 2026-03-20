@@ -2,6 +2,8 @@ package com.kilu.pocketagent.core.hub.web
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -10,42 +12,65 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import kotlinx.coroutines.*
-import kotlin.coroutines.resume
+import kotlinx.coroutines.future.await
+import java.util.concurrent.CompletableFuture
 
+/**
+ * WebViewExecutor — headless WebView wrapper for background service execution.
+ *
+ * KEY DESIGN CONSTRAINT:
+ * We must NOT use withContext(Dispatchers.Main) as a suspension wrapper because:
+ * - If called from a coroutine running on Dispatchers.IO, the Main dispatcher is not
+ *   blocked (good), but the timeout coroutine ALSO dispatches to Main (deadlock on some paths).
+ * - The correct pattern for service-context WebView is to use Handler(Looper.getMainLooper())
+ *   directly for WebView operations, and CompletableFuture / CompletableDeferred for results.
+ *
+ * This avoids all dispatcher-level deadlocks.
+ */
 class WebViewExecutor(private val context: Context) {
+    private val mainHandler = Handler(Looper.getMainLooper())
     private var webView: WebView? = null
     private var currentHttpError: String? = null
-    
-    // A2: State Machine
+
     enum class ExecutionState {
         IDLE, LOAD_START, DOM_READY, EXTRACT, DONE, FAILED
     }
     var state = ExecutionState.IDLE
         private set
 
+    /**
+     * Initialize WebView on the Main thread via Handler.
+     * This method is safe to call from any coroutine context.
+     */
     suspend fun initialize() {
-        withContext(Dispatchers.Main) {
-            if (webView == null) {
-                webView = WebView(context).apply {
-                    settings.javaScriptEnabled = true
-                    settings.domStorageEnabled = true
-                    
-                    // A1. Minimal Sandboxing Defaults
-                    settings.allowFileAccess = false
-                    settings.allowContentAccess = false
-                    settings.allowFileAccessFromFileURLs = false
-                    settings.allowUniversalAccessFromFileURLs = false
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                        settings.safeBrowsingEnabled = true
+        val future = CompletableFuture<Unit>()
+        mainHandler.post {
+            try {
+                if (webView == null) {
+                    webView = WebView(context).apply {
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.allowFileAccess = false
+                        settings.allowContentAccess = false
+                        settings.allowFileAccessFromFileURLs = false
+                        settings.allowUniversalAccessFromFileURLs = false
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                            settings.safeBrowsingEnabled = true
+                        }
+                        settings.userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
                     }
-                    settings.userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
                 }
+                future.complete(Unit)
+            } catch (e: Exception) {
+                future.completeExceptionally(e)
             }
         }
+        future.await()
     }
 
     suspend fun destroy() {
-        withContext(Dispatchers.Main) {
+        val future = CompletableFuture<Unit>()
+        mainHandler.post {
             webView?.apply {
                 stopLoading()
                 clearHistory()
@@ -55,28 +80,34 @@ class WebViewExecutor(private val context: Context) {
             }
             webView = null
             state = ExecutionState.IDLE
+            future.complete(Unit)
         }
+        future.await()
     }
 
     /**
-     * Loads the URL and waits for onPageFinished (DOM_READY)
-     * Throws an Exception if an HTTP auth/paywall error is encountered.
-     * Uses granular timeouts logic. (A3)
+     * Load a URL and wait for page load to complete.
+     * Uses CompletableFuture + Handler — no coroutine dispatcher blocking.
+     * Timeout runs on a separate thread pool (not Main), so it always fires.
      */
-    suspend fun loadUrl(url: String, pageLoadTimeoutMs: Long = 15000, domReadyTimeoutMs: Long = 5000): Result<Unit> = withContext(Dispatchers.Main) {
-        if (webView == null) return@withContext Result.failure(IllegalStateException("WebView not initialized"))
-        
+    suspend fun loadUrl(url: String, pageLoadTimeoutMs: Long = 15000L, domReadyTimeoutMs: Long = 5000L): Result<Unit> {
+        val future = CompletableFuture<Result<Unit>>()
         currentHttpError = null
         state = ExecutionState.LOAD_START
 
-        // Suspend until page is loaded
-        suspendCancellableCoroutine<Result<Unit>> { continuation ->
+        mainHandler.post {
+            val wv = webView
+            if (wv == null) {
+                future.complete(Result.failure(IllegalStateException("WebView not initialized")))
+                return@post
+            }
+
             var finished = false
-            
-            webView?.webViewClient = object : WebViewClient() {
+
+            wv.webViewClient = object : WebViewClient() {
                 override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                     super.onPageStarted(view, url, favicon)
-                    // Removed URL-based auth check — too broad (false-positives on normal URLs)
+                    // No URL-based auth check — too broad, causes false positives
                 }
 
                 override fun onPageFinished(view: WebView?, url: String?) {
@@ -84,17 +115,18 @@ class WebViewExecutor(private val context: Context) {
                     if (!finished) {
                         finished = true
                         state = ExecutionState.DOM_READY
-                        // Wait an extra layout tick just to be safe for SPA framework hydrates
-                        CoroutineScope(Dispatchers.Main).launch {
-                            delay(domReadyTimeoutMs)
-                            if (currentHttpError != null) {
-                                state = ExecutionState.FAILED
-                                continuation.resume(Result.failure(Exception(currentHttpError)))
-                            } else {
-                                state = ExecutionState.EXTRACT
-                                continuation.resume(Result.success(Unit))
+                        // Wait domReadyTimeoutMs for SPA hydration, then resolve
+                        mainHandler.postDelayed({
+                            if (!future.isDone) {
+                                if (currentHttpError != null) {
+                                    state = ExecutionState.FAILED
+                                    future.complete(Result.failure(Exception(currentHttpError)))
+                                } else {
+                                    state = ExecutionState.EXTRACT
+                                    future.complete(Result.success(Unit))
+                                }
                             }
-                        }
+                        }, domReadyTimeoutMs)
                     }
                 }
 
@@ -106,9 +138,7 @@ class WebViewExecutor(private val context: Context) {
                     super.onReceivedHttpError(view, request, errorResponse)
                     if (request?.isForMainFrame == true) {
                         val code = errorResponse?.statusCode ?: 0
-                        if (request.isForMainFrame) {
-                            currentHttpError = "HTTP Error $code on main frame"
-                        }
+                        currentHttpError = "HTTP Error $code on main frame"
                     }
                 }
 
@@ -124,30 +154,40 @@ class WebViewExecutor(private val context: Context) {
                 }
             }
 
-            webView?.loadUrl(url)
+            wv.loadUrl(url)
 
-            // Fix: use Dispatchers.IO for the timeout — Dispatchers.Main is blocked by the
-            // outer withContext(Main) waiting for this suspend. Using Main here = deadlock.
-            CoroutineScope(Dispatchers.IO).launch {
-                delay(pageLoadTimeoutMs)
-                if (!finished) {
+            // Timeout: runs on a background thread — NOT on Main — so it always fires
+            Thread {
+                Thread.sleep(pageLoadTimeoutMs)
+                if (!finished && !future.isDone) {
                     finished = true
-                    withContext(Dispatchers.Main) { webView?.stopLoading() }
-                    state = ExecutionState.FAILED
-                    if (continuation.isActive) {
-                        continuation.resume(Result.failure(Exception("pageLoadTimeout of ${pageLoadTimeoutMs}ms exceeded.")))
+                    mainHandler.post {
+                        wv.stopLoading()
+                        state = ExecutionState.FAILED
                     }
+                    future.complete(Result.failure(Exception("pageLoadTimeout of ${pageLoadTimeoutMs}ms exceeded.")))
                 }
-            }
+            }.start()
         }
+
+        return future.await()
     }
 
-    // A3: jsEvalTimeout added
-    suspend fun evaluateJavascript(script: String, jsEvalTimeoutMs: Long = 3000): String = withContext(Dispatchers.Main) {
-        val wv = webView ?: throw IllegalStateException("WebView not initialized")
-        suspendCancellableCoroutine { continuation ->
+    /**
+     * Evaluate JavaScript and return the result string.
+     * Uses CompletableFuture — safe from any coroutine context.
+     */
+    suspend fun evaluateJavascript(script: String, jsEvalTimeoutMs: Long = 3000L): String {
+        val future = CompletableFuture<String>()
+
+        mainHandler.post {
+            val wv = webView
+            if (wv == null) {
+                future.complete("")
+                return@post
+            }
+
             var resolved = false
-            
             wv.evaluateJavascript(script) { result ->
                 if (!resolved) {
                     resolved = true
@@ -156,21 +196,26 @@ class WebViewExecutor(private val context: Context) {
                     } else {
                         result ?: ""
                     }
-                    val unescaped = cleaned.replace("\\\\u([0-9A-Fa-f]{4})".toRegex()) {
-                        it.groupValues[1].toInt(16).toChar().toString()
-                    }.replace("\\\\n", "\n").replace("\\\\\"", "\"")
-                    
-                    continuation.resume(unescaped)
+                    val unescaped = cleaned
+                        .replace("\\u([0-9A-Fa-f]{4})".toRegex()) {
+                            it.groupValues[1].toInt(16).toChar().toString()
+                        }
+                        .replace("\\n", "\n")
+                        .replace("\\\"", "\"")
+                    future.complete(unescaped)
                 }
             }
 
-            CoroutineScope(Dispatchers.Main).launch {
-                delay(jsEvalTimeoutMs)
+            // Timeout on background thread — always fires
+            Thread {
+                Thread.sleep(jsEvalTimeoutMs)
                 if (!resolved) {
                     resolved = true
-                    continuation.resume("") // Return empty on eval timeout
+                    future.complete("")
                 }
-            }
+            }.start()
         }
+
+        return future.await()
     }
 }
