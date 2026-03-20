@@ -43,36 +43,37 @@ class ControlPlaneApi(
 
     // ── Hub Queue ──────────────────────────────────────────────────────────────
 
-    suspend fun pollQueue(max: Int = 1): List<HubQueueResponse> =
-        withContext(Dispatchers.IO) {
-            try {
-                val req = Request.Builder()
-                    .url("$baseUrl/hub/queue?max=$max")
-                    .get()
-                    .build()
-                val resp = client.newCall(req).execute()
-                when {
-                    resp.isSuccessful -> {
-                        val body = resp.body?.string() ?: ""
-                        val wrapper = json.decodeFromString<HubQueueListResponse>(body)
-                        logger.d("ControlPlaneApi", "pollQueue ok items=${wrapper.items.size}")
-                        wrapper.items
-                    }
-                    resp.code == 401 || resp.code == 403 -> {
-                        logger.e("ControlPlaneApi", "pollQueue auth error ${resp.code}")
-                        onAuthFailure?.invoke()
-                        emptyList()
-                    }
-                    else -> {
-                        logger.e("ControlPlaneApi", "pollQueue http=${resp.code}")
-                        emptyList()
-                    }
+    // Non-blocking: uses Call.awaitResponse() from OkHttpExtensions.kt
+    // No withContext(Dispatchers.IO) needed — enqueue() is async by design.
+    suspend fun pollQueue(max: Int = 1): List<HubQueueResponse> {
+        return try {
+            val req = Request.Builder()
+                .url("$baseUrl/hub/queue?max=$max")
+                .get()
+                .build()
+            val resp = client.newCall(req).awaitResponse()
+            when {
+                resp.isSuccessful -> {
+                    val body = resp.body?.string() ?: ""
+                    val wrapper = json.decodeFromString<HubQueueListResponse>(body)
+                    logger.d("ControlPlaneApi", "pollQueue ok items=${wrapper.items.size}")
+                    wrapper.items
                 }
-            } catch (e: Exception) {
-                logger.e("ControlPlaneApi", "pollQueue parse/fetch error", e)
-                emptyList()
+                resp.code == 401 || resp.code == 403 -> {
+                    logger.e("ControlPlaneApi", "pollQueue auth error ${resp.code}")
+                    onAuthFailure?.invoke()
+                    emptyList()
+                }
+                else -> {
+                    logger.e("ControlPlaneApi", "pollQueue http=${resp.code}")
+                    emptyList()
+                }
             }
+        } catch (e: Exception) {
+            logger.e("ControlPlaneApi", "pollQueue parse/fetch error", e)
+            emptyList()
         }
+    }
 
     // ── Plan Approval ──────────────────────────────────────────────────────────
 
@@ -133,101 +134,98 @@ class ControlPlaneApi(
      * Returns true on success, false on quota/error.
      * Throws on unrecoverable 401/403 (token cleared).
      */
-    suspend fun mintStepBatch(grantId: String, req: MintStepBatchReq): MintStepBatchResp? =
-        withContext(Dispatchers.IO) {
-            try {
-                val body = json.encodeToString(req).toByteArray()
-                    .toRequestBody(mediaTypeJson)
-                val httpReq = Request.Builder()
-                    .url("$baseUrl/grants/$grantId/mint-step-batch")
-                    .post(body)
-                    .build()
-                val resp = client.newCall(httpReq).execute()
-                when {
-                    resp.isSuccessful -> {
-                        val respBody = resp.body?.string() ?: ""
-                        json.decodeFromString<MintStepBatchResp>(respBody)
-                    }
-                    resp.code == 401 || resp.code == 403 -> {
-                        logger.e("ControlPlaneApi", "mintStepBatch auth error ${resp.code}")
-                        onAuthFailure?.invoke()
-                        null
-                    }
-                    resp.code == 429 -> {
-                        logger.e("ControlPlaneApi", "mintStepBatch quota exceeded")
-                        null
-                    }
-                    else -> {
-                        logger.e("ControlPlaneApi", "mintStepBatch http=${resp.code}")
-                        null
-                    }
+    suspend fun mintStepBatch(grantId: String, req: MintStepBatchReq): MintStepBatchResp? {
+        return try {
+            val body = json.encodeToString(req).toByteArray()
+                .toRequestBody(mediaTypeJson)
+            val httpReq = Request.Builder()
+                .url("$baseUrl/grants/$grantId/mint-step-batch")
+                .post(body)
+                .build()
+            val resp = client.newCall(httpReq).awaitResponse()
+            when {
+                resp.isSuccessful -> {
+                    val respBody = resp.body?.string() ?: ""
+                    json.decodeFromString<MintStepBatchResp>(respBody)
                 }
-            } catch (e: Exception) {
-                logger.e("ControlPlaneApi", "mintStepBatch error", e)
-                null
+                resp.code == 401 || resp.code == 403 -> {
+                    logger.e("ControlPlaneApi", "mintStepBatch auth error ${resp.code}")
+                    onAuthFailure?.invoke()
+                    null
+                }
+                resp.code == 429 -> {
+                    logger.e("ControlPlaneApi", "mintStepBatch quota exceeded")
+                    null
+                }
+                else -> {
+                    logger.e("ControlPlaneApi", "mintStepBatch http=${resp.code}")
+                    null
+                }
             }
+        } catch (e: Exception) {
+            logger.e("ControlPlaneApi", "mintStepBatch error", e)
+            null
         }
+    }
 
     // ── Submit Result ──────────────────────────────────────────────────────────
 
     /**
      * Returns true on success or idempotent (409), false on any error.
      */
-    suspend fun submitResult(taskId: String, req: SubmitResultReq): Boolean =
-        withContext(Dispatchers.IO) {
-            try {
-                val body = json.encodeToString(req).toByteArray().toRequestBody(mediaTypeJson)
-                val httpReq = Request.Builder()
-                    .url("$baseUrl/tasks/$taskId/result")
-                    .post(body)
-                    .build()
-                val resp = client.newCall(httpReq).execute()
-                logger.d("ControlPlaneApi", "submitResult HTTP=${resp.code} task=$taskId")
-                when {
-                    resp.isSuccessful || resp.code == 409 -> true
-                    resp.code == 401 || resp.code == 403 -> {
-                        logger.e("ControlPlaneApi", "submitResult auth error ${resp.code}")
-                        onAuthFailure?.invoke()
-                        false
-                    }
-                    else -> {
-                        logger.e("ControlPlaneApi", "submitResult http=${resp.code}")
-                        false
-                    }
+    suspend fun submitResult(taskId: String, req: SubmitResultReq): Boolean {
+        return try {
+            val body = json.encodeToString(req).toByteArray().toRequestBody(mediaTypeJson)
+            val httpReq = Request.Builder()
+                .url("$baseUrl/tasks/$taskId/result")
+                .post(body)
+                .build()
+            val resp = client.newCall(httpReq).awaitResponse()
+            logger.d("ControlPlaneApi", "submitResult HTTP=${resp.code} task=$taskId")
+            when {
+                resp.isSuccessful || resp.code == 409 -> true
+                resp.code == 401 || resp.code == 403 -> {
+                    logger.e("ControlPlaneApi", "submitResult auth error ${resp.code}")
+                    onAuthFailure?.invoke()
+                    false
                 }
-            } catch (e: Exception) {
-                logger.e("ControlPlaneApi", "submitResult error", e)
-                false
+                else -> {
+                    logger.e("ControlPlaneApi", "submitResult http=${resp.code}")
+                    false
+                }
             }
+        } catch (e: Exception) {
+            logger.e("ControlPlaneApi", "submitResult error", e)
+            false
         }
+    }
     // ── Lease Refresh ──────────────────────────────────────────────────────────
 
-    suspend fun refreshLease(taskId: String): Boolean =
-        withContext(Dispatchers.IO) {
-            try {
-                val body = "{\"task_id\":\"$taskId\"}".toRequestBody(mediaTypeJson)
-                val httpReq = Request.Builder()
-                    .url("$baseUrl/hub/lease/refresh")
-                    .post(body)
-                    .build()
-                val resp = client.newCall(httpReq).execute()
-                when {
-                    resp.isSuccessful -> true
-                    resp.code == 401 || resp.code == 403 -> {
-                        logger.e("ControlPlaneApi", "refreshLease auth error ${resp.code}")
-                        onAuthFailure?.invoke()
-                        false
-                    }
-                    else -> {
-                        logger.e("ControlPlaneApi", "refreshLease http=${resp.code}")
-                        false
-                    }
+    suspend fun refreshLease(taskId: String): Boolean {
+        return try {
+            val body = "{\"task_id\":\"$taskId\"}".toRequestBody(mediaTypeJson)
+            val httpReq = Request.Builder()
+                .url("$baseUrl/hub/lease/refresh")
+                .post(body)
+                .build()
+            val resp = client.newCall(httpReq).awaitResponse()
+            when {
+                resp.isSuccessful -> true
+                resp.code == 401 || resp.code == 403 -> {
+                    logger.e("ControlPlaneApi", "refreshLease auth error ${resp.code}")
+                    onAuthFailure?.invoke()
+                    false
                 }
-            } catch (e: Exception) {
-                logger.e("ControlPlaneApi", "refreshLease error", e)
-                false
+                else -> {
+                    logger.e("ControlPlaneApi", "refreshLease http=${resp.code}")
+                    false
+                }
             }
+        } catch (e: Exception) {
+            logger.e("ControlPlaneApi", "refreshLease error", e)
+            false
         }
+    }
 
     // ── Escalation / Assumptions ───────────────────────────────────────────────
 
