@@ -107,13 +107,18 @@ class SerializationGoldenTest {
         val req = MintStepBatchReq(
             runtime_id = "run_1",
             toolchain_id = "tc_1",
-            steps = listOf(StepInfo("step_0", "digest"))
+            // StepInfo has NO step_id — server schema additionalProperties:false
+            // only step_type + step_digest (must be sha256:<64hex>)
+            steps = listOf(StepInfo(step_type = "BROWSER", step_digest = "sha256:" + "a".repeat(64)))
         )
         val encoded = json.encodeToString(req)
         assertTrue(encoded.contains("\"runtime_id\":\"run_1\""), "runtime_id missing: $encoded")
         assertTrue(encoded.contains("\"toolchain_id\":\"tc_1\""), "toolchain_id missing: $encoded")
         assertTrue(encoded.contains("\"steps\""), "steps array missing: $encoded")
-        assertTrue(encoded.contains("\"step_id\":\"step_0\""), "step_id missing: $encoded")
+        assertTrue(encoded.contains("\"step_type\":\"BROWSER\""), "step_type missing: $encoded")
+        assertTrue(encoded.contains("\"step_digest\""), "step_digest missing: $encoded")
+        // Ensure step_id is NOT serialized (server rejects it with additionalProperties:false)
+        assertFalse(encoded.contains("\"step_id\""), "step_id must NOT be in JSON (server rejects it): $encoded")
     }
 
     // ── SubmitResultReq ────────────────────────────────────────────────────────
