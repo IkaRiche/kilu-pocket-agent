@@ -37,6 +37,8 @@ class ControlPlaneApi(
     private val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
+        explicitNulls = false   // null String? fields must be omitted, not sent as JSON null
+        // Server schemas use type:"string" for optional fields — null is rejected by Ajv
     }
 
     private val mediaTypeJson = "application/json".toMediaType()
