@@ -74,9 +74,21 @@ data class Evidence(
 )
 
 @Serializable
-data class SubmitResultReq(
-    val evidence: Evidence
+data class ExecutionResult(
+    val url: String? = null,
+    val final_url: String? = null,
+    val summary: String? = null,
+    val headings: List<String>? = null,
+    val extracted_text_preview: String? = null,
+    val content_type: String? = null
 )
+
+@Serializable
+data class SubmitResultReq(
+    val evidence: Evidence,
+    val result: ExecutionResult? = null  // semantic output for operator visibility
+)
+
 
 @Serializable
 data class AssumptionItemReq(

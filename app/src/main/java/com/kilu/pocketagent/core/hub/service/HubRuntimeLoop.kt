@@ -14,8 +14,7 @@ import kotlinx.coroutines.*
 import com.kilu.pocketagent.core.network.ControlPlaneApi
 import com.kilu.pocketagent.shared.models.*
 import kotlinx.coroutines.*
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
+import com.kilu.pocketagent.shared.models.ExecutionResult
 
 class HubRuntimeLoop(private val context: Context, private val apiClient: ApiClient) {
 
@@ -244,18 +243,7 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
                 return@coroutineScope
             }
 
-            // Build result
-            val textHashHex = DigestUtil.sha256Hex(safeText)
-            val headingsHashHex = DigestUtil.sha256Hex(parsedHeadings.joinToString("|"))
-
-            val hashObj = JsonObject(mapOf(
-                "text_hash" to JsonPrimitive("sha256:$textHashHex"),
-                "headings_hash" to JsonPrimitive("sha256:$headingsHashHex")
-            ))
-
-            val autoSummary = "Fetched ${safeText.length} chars, ${parsedHeadings.size} headings from $finalUrl (requested: ${task.external_url}). Adapter: bounded OkHttp+Jsoup static HTML retrieval (no JS rendering)."
-            val facts = parsedHeadings.take(5).map { "Heading Extracted: $it" }
-
+            // Build Evidence (audit) + ExecutionResult (semantic artifact)
             val finishedTime = java.time.Instant.now().toString()
             val evidence = Evidence(
                 task_id = task.task_id,
@@ -268,8 +256,18 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
                 stdout_hash = "sha256:" + DigestUtil.sha256Hex(safeText),
                 exit_code = 0
             )
-            
-            val ok = controlPlane.submitResult(task.task_id, SubmitResultReq(evidence))
+
+            val autoSummary = "Fetched ${safeText.length} chars, ${parsedHeadings.size} heading(s) from $finalUrl"
+            val resultPayload = ExecutionResult(
+                url = task.external_url,
+                final_url = finalUrl,
+                summary = autoSummary.take(500),
+                headings = parsedHeadings.take(10).ifEmpty { null },
+                extracted_text_preview = safeText.take(500),
+                content_type = "text/html"
+            )
+
+            val ok = controlPlane.submitResult(task.task_id, SubmitResultReq(evidence, resultPayload))
             Log.d("HubRuntimeLoop", "Result submit ok=$ok task=${task.task_id}")
             if (ok) {
                 transition(BackoffState.IDLE, "Success on task ${task.task_id.take(8)}")
