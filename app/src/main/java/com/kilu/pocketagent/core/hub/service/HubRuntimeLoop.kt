@@ -150,13 +150,14 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
                 ?: apiClient.store.getToolchainId()
                 ?: "tc_android_v1"
             Log.d("HubRuntimeLoop", "mint runtimeId=$runtimeId toolchainId=$toolchainId grantId=${task.grant_id}")
-            val stepId = "step_0"
-            val stepDigest = DigestUtil.sha256Hex(task.external_url ?: "")
-            
+            val stepId = "step_0"   // local reference only, NOT sent to server
+            // Server schema: step_digest must be "sha256:<64 lowercase hex>"
+            val stepDigest = "sha256:" + DigestUtil.sha256Hex(task.external_url ?: "")
+
             val mintReq = MintStepBatchReq(
                 runtime_id = runtimeId,
                 toolchain_id = toolchainId,
-                steps = listOf(StepInfo(stepId, stepDigest))
+                steps = listOf(StepInfo(step_digest = stepDigest))
             )
 
             val startTime = java.time.Instant.now().toString()

@@ -26,9 +26,8 @@ data class HubQueueResponse(
 
 @Serializable
 data class StepInfo(
-    val step_id: String,
-    val step_digest: String,
-    val step_type: String = "BROWSER"         // required by server MintStepBatchReq schema
+    val step_type: String = "BROWSER",   // required; NO step_id — server has additionalProperties:false
+    val step_digest: String              // must be "sha256:<64 hex chars>"
 )
 
 @Serializable
