@@ -163,7 +163,8 @@ class ControlPlaneApi(
                             null
                         }
                         else -> {
-                            logger.e("ControlPlaneApi", "mintStepBatch http=${r.code}")
+                            val errBody = r.body?.string() ?: "(empty)"
+                            logger.e("ControlPlaneApi", "mintStepBatch http=${r.code} body=$errBody")
                             null
                         }
                     }

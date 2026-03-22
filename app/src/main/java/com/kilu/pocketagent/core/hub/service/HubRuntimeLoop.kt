@@ -139,10 +139,17 @@ class HubRuntimeLoop(private val context: Context, private val apiClient: ApiCli
                 }
             }
 
-            // Mint batch checks
-            // Fix: use getRuntimeId() (rt_...) NOT getDeviceId() (dvc_...) — server checks runtime_id matches grant
-            val runtimeId = apiClient.store.getRuntimeId() ?: apiClient.store.getDeviceId() ?: "android_unknown"
-            val toolchainId = apiClient.store.getToolchainId() ?: "tc_android_v1"
+            // Binding: use runtime_id/toolchain_id from the queue response.
+            // These are the EXACT values the server bound to the WindowGrant at approval time.
+            // Using DeviceProfileStore values caused ERR_BINDING_MISMATCH (different runtime_id format).
+            val runtimeId   = task.target_runtime_id
+                ?: apiClient.store.getRuntimeId()
+                ?: apiClient.store.getDeviceId()
+                ?: "android_unknown"
+            val toolchainId = task.toolchain_id
+                ?: apiClient.store.getToolchainId()
+                ?: "tc_android_v1"
+            Log.d("HubRuntimeLoop", "mint runtimeId=$runtimeId toolchainId=$toolchainId grantId=${task.grant_id}")
             val stepId = "step_0"
             val stepDigest = DigestUtil.sha256Hex(task.external_url ?: "")
             

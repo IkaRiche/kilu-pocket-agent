@@ -19,13 +19,25 @@ data class HubQueueResponse(
     val external_url: String? = null,
     val expires_at: String? = null,
     val limits: JsonObject? = null,
-    val forbidden: JsonObject? = null
+    val forbidden: JsonObject? = null,
+    val toolchain_id: String? = null,         // grant-bound toolchain — use for mintStepBatch
+    val target_runtime_id: String? = null     // grant-bound runtime — use for mintStepBatch
 )
 
 @Serializable
 data class StepInfo(
     val step_id: String,
-    val step_digest: String
+    val step_digest: String,
+    val step_type: String = "BROWSER"         // required by server MintStepBatchReq schema
+)
+
+@Serializable
+data class StepToken(
+    val token_id: String,
+    val jti: String,
+    val exp: String,
+    val claims_jcs: String,
+    val sig_b64: String
 )
 
 @Serializable
@@ -37,9 +49,7 @@ data class MintStepBatchReq(
 
 @Serializable
 data class MintStepBatchResp(
-    val batch_id: String,
-    val size: Int,
-    val issued_at: String
+    val tokens: List<StepToken>   // server returns { tokens: [...] }
 )
 
 @Serializable
