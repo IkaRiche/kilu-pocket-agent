@@ -183,7 +183,9 @@ class ControlPlaneApi(
      */
     suspend fun submitResult(taskId: String, req: SubmitResultReq): Boolean {
         return try {
-            val body = json.encodeToString(req).toByteArray().toRequestBody(mediaTypeJson)
+            val bodyStr = json.encodeToString(req)
+            logger.d("ControlPlaneApi", "submitResult body=$bodyStr")
+            val body = bodyStr.toByteArray().toRequestBody(mediaTypeJson)
             val httpReq = Request.Builder()
                 .url("$baseUrl/tasks/$taskId/result")
                 .post(body)
@@ -200,7 +202,8 @@ class ControlPlaneApi(
                             false
                         }
                         else -> {
-                            logger.e("ControlPlaneApi", "submitResult http=${r.code}")
+                            val errBody = r.body?.string() ?: "(empty)"
+                            logger.e("ControlPlaneApi", "submitResult http=${r.code} body=$errBody")
                             false
                         }
                     }
