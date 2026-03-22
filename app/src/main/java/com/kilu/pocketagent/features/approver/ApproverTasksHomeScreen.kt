@@ -87,7 +87,14 @@ fun ApproverTasksHomeScreen(
         }
     }
 
-    LaunchedEffect(Unit) { loadTasks() }
+    LaunchedEffect(Unit) {
+        loadTasks()
+        while (true) {
+            kotlinx.coroutines.delay(10_000L)
+            loadTasks()
+        }
+    }
+
 
     // Delete confirmation dialog
     taskToDelete?.let { task ->
