@@ -54,7 +54,7 @@ KiLu is an **authority fabric** for agentic execution:
 | Android Hub | Validation runtime — E2E proof, demos | ✅ Confirmed working |
 | Android Approver | Human authority device — production | ✅ Confirmed working |
 | Linux Hub | Production execution path | 🔵 Planned (R2) |
-| SDK adapters | Wrap existing agents (OpenAI, LangChain, etc.) | 🔵 Planned |
+| SDK adapters | [`kilu-sdk`](https://github.com/IkaRiche/kilu-sdk) — wrap existing agents (TypeScript) | ✅ Shipped v0.1 |
 
 **Android Hub is validation, not production.** The production execution path is Linux Hub. Android proves the authority model works; Linux will carry production load.
 
@@ -179,6 +179,8 @@ Project-level governance and phase tracking live in the main repository:
 ## Related Repositories
 
 - [KiLu-Network](https://github.com/IkaRiche/KiLu-Network) — Cloud Control Plane, Telegram Bot, governance docs, phase tracking
+- [kilu-sdk](https://github.com/IkaRiche/kilu-sdk) — TypeScript SDK: `KiluClient`, intent submission, receipt verification (`@kilu/sdk`)
+- [KiLu](https://github.com/IkaRiche/KiLu) — DeTAK (Deterministic Transaction & Authority Kernel) — protocol core
 
 ---
 
