@@ -1,44 +1,66 @@
 # KiLu Pocket Agent
 
-**The end of god-mode agents.**
-A split-trust mobile agent where **the cloud can think**, but **the phone can only act with cryptographic authority**.
+**Approval-bound execution layer for AI agents.**  
+A split-trust system where **the cloud orchestrates**, **the phone authorizes**, and **the Hub executes only with cryptographic mandate**.
 
-> KiLu separates *brains* from *hands*:
-> **Hub** executes in a constrained sandbox.
-> **Approver** holds keys and confirms intent with biometrics.
-> **Control Plane** enforces deterministic policy and issues single-use capability tokens.
-
----
-
-## Current Status — Phase 10B ✅
-
-This app is the **Android Approver + Hub** client for the KiLu Network.
-
-| Component | Status |
-|---|---|
-| Approver pairing ceremony | ✅ Live |
-| Task creation (free text + skill) | ✅ Live |
-| Plan approval (biometric Ed25519 signing) | ✅ Live |
-| Hub device registration + runtime binding | ✅ Live |
-| Hub task queue polling | ✅ Live (Phase 10A: runtime-bound + grant-gated) |
-| Step token minting via `mint-step-batch` | ✅ Live |
-| Device list screen | ✅ Live |
-| **Bug fixed**: `ApiClient.apiUrl('')` trailing slash | ✅ Fixed (commit `75e955f`) |
-
-**Bug note:** All `GET /v1/devices`, `GET /v1/tasks`, `GET /v1/hub/queue` calls were returning 404
-because `apiUrl('')` produced a trailing slash → double-slash URL (`/v1//devices`).
-Fixed in `ApiClient.kt` — one-liner, all 10+ call sites covered.
-
-**Backend:** [KiLu-Network](https://github.com/IkaRiche/KiLu-Network) — Cloud CP + Telegram Bot, Phase 10B complete.
-
-### Coming in Phase 10C
-- Real-time push notifications (FCM) for plan approval events
-- DeerFlow as planning layer behind Telegram Bot
-- Telegram → DeerFlow plan → KiLu approval → Hub execution
+> KiLu separates *brains* from *hands*:  
+> **Hub** executes in a constrained sandbox — only what it was explicitly granted.  
+> **Approver** holds keys and confirms intent with biometrics.  
+> **Control Plane** issues single-use capability tokens and enforces deterministic policy.
 
 ---
 
-## Why this exists
+## Confirmed Baseline — 2026-03-23 ✅
+
+**Full end-to-end path confirmed working on live runtime.**
+
+| Layer | Component | Status |
+|---|---|---|
+| Interface | Telegram Bot (task creation) | ✅ Live |
+| Authority | Android Approver (biometric Ed25519) | ✅ Live |
+| Execution | Android Hub (validation runtime) | ✅ Live |
+| Notification | Telegram DONE notification | ✅ Confirmed |
+
+**Smoke test:** 3 consecutive runs — no D1 edits, no restarts, no re-pairing.
+
+| Run | Site | DONE |
+|-----|------|------|
+| 1 | klimacoach.com | ✅ |
+| 2 | orf.at | ✅ |
+| 3 | bbc.com | ✅ |
+
+**What this means:** The full operator cycle — task creation → human approval → execution → result → human-visible DONE notification — is proven end-to-end. This is not a prototype showing one path in isolation.
+
+---
+
+## What KiLu Is
+
+KiLu is an **authority fabric** for agentic execution:
+
+- **Grants** — structured, time-bounded permission objects
+- **Runtime binding** — execution is cryptographically tied to a specific device
+- **Human approval** — biometric signature required before any step runs
+- **Constrained execution** — Hub refuses without valid capability token
+- **Evidence** — every outcome is hash-bound and auditable
+
+> KiLu does **not** rely on "trust the model". It relies on **cryptographic constraints**.
+
+---
+
+## Runtime Classification
+
+| Runtime | Role | Status |
+|---|---|---|
+| Android Hub | Validation runtime — E2E proof, demos | ✅ Confirmed working |
+| Android Approver | Human authority device — production | ✅ Confirmed working |
+| Linux Hub | Production execution path | 🔵 Planned (R2) |
+| SDK adapters | Wrap existing agents (OpenAI, LangChain, etc.) | 🔵 Planned |
+
+**Android Hub is validation, not production.** The production execution path is Linux Hub. Android proves the authority model works; Linux will carry production load.
+
+---
+
+## Why This Exists
 
 Most "agent frameworks" implicitly grant the LLM **god-mode**: unlimited tool access, long feedback loops, and unverifiable behavior.
 
@@ -46,12 +68,11 @@ KiLu is built for the opposite:
 - **Authority is explicit** — capability tokens + human biometric signatures
 - **Execution is constrained** — Hub refuses without cryptographic mandate
 - **Outcomes are auditable** — evidence hashes + receipts, offline-verifiable
-
-> KiLu does **not** rely on "trust the model". It relies on **cryptographic constraints**.
+- **The model is never trusted** — KiLu wraps any agent and constrains it
 
 ---
 
-## Architecture (Zero-Trust Split-Trust)
+## Architecture (Split-Trust)
 
 ```mermaid
 flowchart LR
@@ -82,13 +103,13 @@ flowchart LR
 
 ---
 
-## Three guarantees (with proof)
+## Three Guarantees
 
 1. **Fail-closed** — without a valid StepToken, Hub refuses execution.
 2. **Replay-proof** — each capability is single-use (JTI) and time-bounded (exp).
 3. **Tamper-evident** — every output is bound to evidence hashes and receipts.
 
-See [KiLu-Network/GUARANTEES.md](https://github.com/IkaRiche/KiLu-Network/blob/main/GUARANTEES.md).
+See [GUARANTEES.md](GUARANTEES.md).
 
 ---
 
@@ -97,23 +118,20 @@ See [KiLu-Network/GUARANTEES.md](https://github.com/IkaRiche/KiLu-Network/blob/m
 ### Prerequisites
 
 - Two Android devices (or one device + emulator): **Hub** + **Approver**
-- Running Control Plane: [KiLu-Network cloud/](https://github.com/IkaRiche/KiLu-Network/tree/main/cloud)
+- Running Control Plane: [KiLu-Network/cloud](https://github.com/IkaRiche/KiLu-Network/tree/main/cloud)
 
 ```bash
-# Control Plane (local dev)
-cd cloud && npm install && wrangler dev --local
-
 # Android app
 ./gradlew assembleDevDebug
 # Install on both Hub and Approver devices
 ```
 
-### Pairing flow
+### Pairing Flow
 
 1. **Approver** → Register as Approver (creates Ed25519 device identity)
 2. **Approver** → Devices → "Pair a Hub" (generates QR code)
 3. **Hub** → Scan QR → Confirm & Connect
-4. **Hub** → Hub is now online and ready to receive tasks
+4. Hub is now online and ready to receive tasks
 
 ---
 
@@ -121,13 +139,13 @@ cd cloud && npm install && wrangler dev --local
 
 The approval UI MUST display the following **without truncation**:
 
-1. **Header**: verb + object (`e.g. "Execute: tracer echo"`)
+1. **Header**: verb + object (`e.g. "Execute: fetch orf.at"`)
 2. **Target runtime**: Hub device and `runtime_id`
 3. **Constraints**: max steps, allowed domains, time window
 4. **Fingerprint**: `AVO#<base32(avo_hash[:5])>` — human-verifiable short code
 5. **Risk badges**: External domain / High-risk / New scope
 
-> **Hard deny:** if the app cannot render a known AVO template, approval is blocked. No silent fallback. This satisfies RT-05.
+> **Hard deny:** if the app cannot render a known AVO template, approval is blocked. No silent fallback.
 
 ---
 
@@ -141,21 +159,26 @@ An `ApprovalReceipt` binds:
 
 ---
 
-## Device Keys
+## Governance & Project Status
 
-| Property | Current | Planned |
-|---|---|---|
-| Key generation | On-device Ed25519 | Same |
-| Storage | EncryptedSharedPreferences (AES-256-SIV) | Android Keystore / StrongBox |
-| Exportable | Yes (encrypted at rest) | No (hardware-backed) |
-| Biometric required | Yes (for signing) | Yes |
+This repository is the **Android authority layer** of KiLu.  
+Project-level governance and phase tracking live in the main repository:
+
+| Document | Location |
+|---|---|
+| STATUS.md | [KiLu-Network/STATUS.md](https://github.com/IkaRiche/KiLu-Network/blob/main/STATUS.md) |
+| KNOWN_GOOD_BASELINES.md | [KiLu-Network/KNOWN_GOOD_BASELINES.md](https://github.com/IkaRiche/KiLu-Network/blob/main/KNOWN_GOOD_BASELINES.md) |
+| GOVERNANCE.md | [KiLu-Network/GOVERNANCE.md](https://github.com/IkaRiche/KiLu-Network/blob/main/GOVERNANCE.md) |
+
+**Current phase:** R1 — Stabilize the Proven Core  
+**R0 closed:** 2026-03-22  
+**R1 core path:** ✅ Stabilized 2026-03-23
 
 ---
 
 ## Related Repositories
 
-- [KiLu-Network](https://github.com/IkaRiche/KiLu-Network) — Cloud Control Plane, Go runner, verifier, trust-center, Telegram bot
-- [ROADMAP.md](https://github.com/IkaRiche/KiLu-Network/blob/main/ROADMAP.md) — Product specification v2.0 + shipped status
+- [KiLu-Network](https://github.com/IkaRiche/KiLu-Network) — Cloud Control Plane, Telegram Bot, governance docs, phase tracking
 
 ---
 
