@@ -170,9 +170,10 @@ Project-level governance and phase tracking live in the main repository:
 | KNOWN_GOOD_BASELINES.md | [KiLu-Network/KNOWN_GOOD_BASELINES.md](https://github.com/IkaRiche/KiLu-Network/blob/main/KNOWN_GOOD_BASELINES.md) |
 | GOVERNANCE.md | [KiLu-Network/GOVERNANCE.md](https://github.com/IkaRiche/KiLu-Network/blob/main/GOVERNANCE.md) |
 
-**Current phase:** R1 — Stabilize the Proven Core  
+**Current phase:** R2 — Android Wedge Packaging  
 **R0 closed:** 2026-03-22  
-**R1 core path:** ✅ Stabilized 2026-03-23
+**R1 closed:** ✅ 2026-03-23 — E2E 3/3 confirmed, D1 cleaned, `registerRuntime` fixed  
+**R2 active:** TaskDetailScreen (real evidence preview)
 
 ---
 
