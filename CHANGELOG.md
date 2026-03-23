@@ -2,6 +2,28 @@
 
 All notable changes to KiLu Pocket Agent.
 
+## [Baseline] — 2026-03-23
+
+### System Milestone — R1 Smoke Test 3/3 PASSED
+
+End-to-end system baseline confirmed across all three layers (Android App, Control Plane, Telegram Bot).
+
+**Smoke test results** (no D1 edits, no service restarts between runs, no re-pairing):
+
+| Run | Task | Site | DONE notification |
+|-----|------|------|------------------|
+| 1 | tsk_00c14c40 | heizungsrechner.de → klimacoach.com | ✅ 10:03 |
+| 2 | tsk_f6bd27ff | orf.at | ✅ 10:26 |
+| 3 | tsk_0e5665 | bbc.com | ✅ 10:30 |
+
+**Confirmed working path:** Telegram Bot → create task → Approver biometric approval → Hub execution → result → Telegram DONE notification.
+
+**Root cause note:** The `getTask()` contract (bare object, no `{ task: ... }` envelope) was correctly handled in Android `v0.9.5`. The same fix was independently required and applied to the Telegram bot layer (`KiLu-Network commit 5faf799`). Both sides now match the server contract.
+
+**Bot uptime during test:** 12h+ continuous (pm2, no restart). Code frozen at `KiLu-Network@f1575ee`.
+
+---
+
 ## [0.9.3] — 2026-03-19
 
 ### Added / Improved

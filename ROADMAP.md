@@ -1,6 +1,6 @@
 # Roadmap — kilu-pocket-agent
 
-## Current Version: v0.9.5
+## Current Version: v0.9.29
 
 ## Shipped
 
@@ -10,6 +10,8 @@
 | **v0.9.3** | Window insets / edge-to-edge baseline across all screens | ✅ Done |
 | **v0.9.4** | CI compile fix (`windowInsets`→`contentWindowInsets`, stray brace) | ✅ Done |
 | **v0.9.5** | Hub task routing fix (heartbeat, eligible-runtime selection, auto-bind, getTask parsing) | ✅ Done |
+| **v0.9.29** | Auto-refresh task list every 10s | ✅ Done |
+| **R1 Baseline** | **E2E smoke test 3/3 passed** — Telegram DONE notification confirmed, system considered core-stable | ✅ **2026-03-23** |
 
 ## Phase 1: Hub Routing & Presence (v0.9.5)
 
