@@ -1,7 +1,9 @@
 package com.kilu.pocketagent.features.approver
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -9,16 +11,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.foundation.background
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import com.kilu.pocketagent.core.network.ApiClient
 import com.kilu.pocketagent.core.network.ControlPlaneApi
-import com.kilu.pocketagent.shared.models.ApproverTaskItem
-import com.kilu.pocketagent.shared.models.TaskLifecycleStep
-import com.kilu.pocketagent.shared.models.ExecutionEvidenceUiModel
 import com.kilu.pocketagent.core.ui.components.StatusChip
+import com.kilu.pocketagent.shared.models.TaskDetail
+import com.kilu.pocketagent.shared.models.TaskLifecycleStep
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TaskDetailScreen — R2 evidence view
+// Shows 4 sections for a single task: State, Result, Execution, Evidence Preview.
+// Rule: truthful — if data is absent, says so. No placeholders, no lorem, no N/A-spam.
+// ─────────────────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,14 +33,14 @@ fun TaskDetailScreen(
     apiClient: ApiClient,
     onBack: () -> Unit
 ) {
-    var task by remember { mutableStateOf<ApproverTaskItem?>(null) }
+    var task by remember { mutableStateOf<TaskDetail?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
     val scrollState = rememberScrollState()
 
     LaunchedEffect(taskId) {
         val cp = ControlPlaneApi(apiClient.client, apiClient.apiUrl(""))
-        val result = cp.getTask(taskId)
+        val result = cp.getTaskDetail(taskId)
         if (result != null) {
             task = result
         } else {
@@ -46,166 +52,320 @@ fun TaskDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(task?.title ?: "Task Details") },
+                title = { Text(task?.title ?: "Task Details", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
         }
     ) { padding ->
-        if (isLoading) {
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+        when {
+            isLoading -> {
+                Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
             }
-        } else if (errorMsg != null) {
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text(errorMsg!!, color = MaterialTheme.colorScheme.error)
+            errorMsg != null -> {
+                Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                    Text(errorMsg!!, color = MaterialTheme.colorScheme.error)
+                }
             }
-        } else {
-            val t = task!!
-            Column(
-                Modifier.fillMaxSize().padding(padding).padding(16.dp).verticalScroll(scrollState)
-            ) {
-                // Header Info
-                Text("Task ID: ${t.task_id}", style = MaterialTheme.typography.labelSmall)
-                Text(t.user_prompt ?: "", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 8.dp))
-                
-                Spacer(Modifier.height(16.dp))
-
-                // 1. Dual-Layer Timeline
-                Text("Execution Timeline", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                TimelineView(t)
-
-                Spacer(Modifier.height(24.dp))
-
-                // 2. Evidence Panel
-                if (t.status == "DONE" || t.status == "FAILED") {
-                    Text("Execution Evidence", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                    EvidencePanel(t)
-                } else {
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Text("Execution results will appear here once the task reaches a terminal state.", 
-                             modifier = Modifier.padding(16.dp),
-                             style = MaterialTheme.typography.bodySmall)
+            else -> {
+                val t = task!!
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .verticalScroll(scrollState),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // ── 1. Task State ─────────────────────────────────────────
+                    SectionCard(title = "Task State") {
+                        DetailRow("Status") {
+                            StatusChip(t.status)
+                        }
+                        DetailRowText("Task ID", t.task_id)
+                        t.target_runtime_id?.let { DetailRowText("Runtime", it) }
+                        t.created_at?.let { DetailRowText("Created", formatTimestamp(it)) }
+                        t.updated_at?.let { ts ->
+                            if (isTerminal(t.status)) {
+                                DetailRowText("Completed", formatTimestamp(ts))
+                            }
+                        }
                     }
+
+                    // ── 2. Result ─────────────────────────────────────────────
+                    SectionCard(title = "Result") {
+                        val r = t.result?.result
+                        if (r == null) {
+                            AbsentNote(if (isTerminal(t.status)) "Result unavailable." else "Result pending execution.")
+                        } else {
+                            r.url?.let { DetailRowText("URL", it) }
+                            r.final_url?.takeIf { it != r.url }?.let { DetailRowText("Final URL", it) }
+                            r.summary?.let { DetailRowText("Summary", it) }
+                            val headings = r.headings
+                            if (!headings.isNullOrEmpty()) {
+                                Spacer(Modifier.height(4.dp))
+                                Text("Headings", style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(Modifier.height(2.dp))
+                                headings.take(8).forEachIndexed { i, h ->
+                                    Row(Modifier.padding(vertical = 1.dp)) {
+                                        Text("${i + 1}. ", style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(h, style = MaterialTheme.typography.bodySmall,
+                                            maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                    }
+                                }
+                                if (headings.size > 8) {
+                                    Text("+ ${headings.size - 8} more", style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            } else {
+                                DetailRowText("Headings", "None extracted")
+                            }
+                        }
+                    }
+
+                    // ── 3. Execution ──────────────────────────────────────────
+                    SectionCard(title = "Execution") {
+                        val ev = t.result?.evidence
+                        val r  = t.result?.result
+                        if (ev == null) {
+                            AbsentNote(if (isTerminal(t.status)) "No execution record stored." else "Execution not yet started.")
+                        } else {
+                            ev.adapter?.let  { DetailRowText("Adapter", it) }
+                            ev.outcome?.let  { DetailRowText("Outcome", it.uppercase()) }
+                            t.durationLabel()?.let { DetailRowText("Duration", it) }
+                            r?.content_type?.let { DetailRowText("Content type", it) }
+                            // char/heading count from summary if present
+                            r?.summary?.let { summary ->
+                                val charMatch = Regex("(\\d+) char").find(summary)
+                                val headMatch = Regex("(\\d+) heading").find(summary)
+                                if (charMatch != null || headMatch != null) {
+                                    val facts = listOfNotNull(
+                                        charMatch?.groupValues?.get(1)?.let { "$it chars" },
+                                        headMatch?.groupValues?.get(1)?.let { "$it headings" }
+                                    ).joinToString(", ")
+                                    if (facts.isNotEmpty()) DetailRowText("Fetched", facts)
+                                }
+                            }
+                            // Show failure if terminal-failure
+                            t.failure?.let { f ->
+                                Spacer(Modifier.height(4.dp))
+                                HorizontalDivider()
+                                Spacer(Modifier.height(4.dp))
+                                f.code?.let    { DetailRowText("Failure code", it) }
+                                f.message?.let { DetailRowText("Failure msg",  it) }
+                            }
+                        }
+                    }
+
+                    // ── 4. Evidence Preview ───────────────────────────────────
+                    SectionCard(title = "Evidence Preview") {
+                        val ev = t.result?.evidence
+                        if (ev == null) {
+                            if (t.failure != null) {
+                                FactLine("Result stored", false)
+                                FactLine("Evidence stored", false)
+                                t.failure.code?.let { DetailRowText("Terminated with", it) }
+                            } else {
+                                AbsentNote("No evidence payload — task did not complete execution.")
+                            }
+                        } else {
+                            FactLine("Result stored", ev.outcome == "success")
+                            FactLine("Evidence stored", true)
+                            FactLine("Executed on active runtime", t.target_runtime_id != null)
+                            ev.stdout_hash?.let { hash ->
+                                Spacer(Modifier.height(4.dp))
+                                Text("Evidence hash", style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(
+                                    // Show first 20 chars of hash — enough to confirm it's real
+                                    hash.take(32) + "…",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    // ── Timeline ──────────────────────────────────────────────
+                    SectionCard(title = "Lifecycle") {
+                        TaskTimelineView(t)
+                    }
+
+                    Spacer(Modifier.height(16.dp))
                 }
             }
         }
     }
 }
 
-@Composable
-fun TimelineView(task: ApproverTaskItem) {
-    val steps = deriveTimeline(task)
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Column(Modifier.padding(16.dp)) {
-            steps.forEachIndexed { index, step ->
-                Row(verticalAlignment = Alignment.Top) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Surface(
-                            shape = androidx.compose.foundation.shape.CircleShape,
-                            color = if (step.isCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                            modifier = Modifier.size(12.dp)
-                        ) {}
-                        if (index < steps.size - 1) {
-                            Box(Modifier.width(2.dp).height(24.dp).background(MaterialTheme.colorScheme.surfaceVariant))
-                        }
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(step.label, style = MaterialTheme.typography.bodyMedium, fontWeight = if (step.isCurrent) FontWeight.Bold else FontWeight.Normal)
-                            Spacer(Modifier.width(8.dp))
-                            StatusBadge(step.protocolState)
-                        }
-                        if (step.timestamp != null) {
-                            Text(step.timestamp, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-                if (index < steps.size - 1) Spacer(Modifier.height(8.dp))
-            }
-        }
-    }
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Section card wrapper
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-fun StatusBadge(state: String) {
-    Surface(
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        shape = MaterialTheme.shapes.extraSmall
+private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Text(state, modifier = Modifier.padding(horizontal = 4.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+            HorizontalDivider(Modifier.padding(bottom = 4.dp))
+            content()
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Row variants
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun DetailRowText(label: String, value: String) {
+    Column(Modifier.fillMaxWidth()) {
+        Text(label, style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.bodySmall, maxLines = 3, overflow = TextOverflow.Ellipsis)
     }
 }
 
 @Composable
-fun EvidencePanel(task: ApproverTaskItem) {
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
-        Column(Modifier.padding(16.dp)) {
-            EvidenceRow("Outcome", if (task.status == "DONE") "SUCCESS" else "FAILURE")
-            EvidenceRow("Artifact Hash (STDOUT)", "sha256:e3b0c442... (Placeholder)")
-            EvidenceRow("Execution Log", "sha256:bc8912..." )
-            
-            task.final_report?.let { report ->
-                Divider(Modifier.padding(vertical = 12.dp))
-                Text("Normalized Summary", style = MaterialTheme.typography.labelLarge)
-                Text(report, style = MaterialTheme.typography.bodySmall)
+private fun DetailRow(label: String, content: @Composable () -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        content()
+    }
+}
+
+@Composable
+private fun FactLine(label: String, present: Boolean) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Surface(
+            shape = CircleShape,
+            color = if (present) MaterialTheme.colorScheme.tertiary
+                    else MaterialTheme.colorScheme.error.copy(alpha = 0.5f),
+            modifier = Modifier.size(8.dp)
+        ) {}
+        Spacer(Modifier.width(8.dp))
+        Text(label, style = MaterialTheme.typography.bodySmall)
+        Spacer(Modifier.weight(1f))
+        Text(
+            if (present) "✓" else "✗",
+            style = MaterialTheme.typography.bodySmall,
+            color = if (present) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
+        )
+    }
+}
+
+@Composable
+private fun AbsentNote(text: String) {
+    Text(text, style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Timeline
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+fun TaskTimelineView(task: TaskDetail) {
+    val steps = deriveDetailTimeline(task)
+    Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+        steps.forEachIndexed { index, step ->
+            Row(verticalAlignment = Alignment.Top) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Surface(
+                        shape = CircleShape,
+                        color = when {
+                            step.isError    -> MaterialTheme.colorScheme.error
+                            step.isCurrent  -> MaterialTheme.colorScheme.primary
+                            step.isCompleted -> MaterialTheme.colorScheme.tertiary
+                            else            -> MaterialTheme.colorScheme.surfaceVariant
+                        },
+                        modifier = Modifier.size(10.dp)
+                    ) {}
+                    if (index < steps.size - 1) {
+                        Box(
+                            Modifier
+                                .width(2.dp)
+                                .height(28.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                        )
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.padding(bottom = 4.dp)) {
+                    Text(
+                        step.label,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = if (step.isCurrent) FontWeight.Bold else FontWeight.Normal
+                    )
+                    if (step.timestamp != null) {
+                        Text(step.timestamp, style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
             }
         }
     }
 }
 
-@Composable
-fun EvidenceRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, style = MaterialTheme.typography.labelMedium)
-        Text(value, style = MaterialTheme.typography.bodySmall)
-    }
-}
-
-private fun deriveTimeline(task: ApproverTaskItem): List<TaskLifecycleStep> {
-    val states = listOf("PLANNING", "NEEDS_PLAN_APPROVAL", "READY_FOR_EXECUTION", "EXECUTING", "DONE")
+private fun deriveDetailTimeline(task: TaskDetail): List<TaskLifecycleStep> {
+    val orderedStates = listOf("PLANNING", "NEEDS_PLAN_APPROVAL", "READY_FOR_EXECUTION", "EXECUTING", "DONE")
     val labels = mapOf(
-        "PLANNING" to "Plan Draft Generation",
-        "NEEDS_PLAN_APPROVAL" to "Pending Approver Authorization",
-        "READY_FOR_EXECUTION" to "Authority Window Granted",
-        "EXECUTING" to "Autonomous Hub Execution",
-        "DONE" to "Execution Finalized",
-        "FAILED" to "Terminal Failure",
-        "CANCELLED" to "Revoked by Approver"
+        "PLANNING"              to "Plan Generation",
+        "NEEDS_PLAN_APPROVAL"   to "Awaiting Approval",
+        "READY_FOR_EXECUTION"   to "Authority Granted",
+        "EXECUTING"             to "Hub Executing",
+        "DONE"                  to "Completed",
+        "FAILED"                to "Failed",
+        "CANCELLED"             to "Cancelled"
     )
-
-    val currentIdx = states.indexOf(task.status)
+    val currentIdx = orderedStates.indexOf(task.status)
     val result = mutableListOf<TaskLifecycleStep>()
 
-    states.forEachIndexed { idx, s ->
-        val label = labels[s] ?: s
-        val isCompleted = if (currentIdx == -1) {
-            // terminal states handle
-            if (task.status == "FAILED" || task.status == "CANCELLED") idx < 4 else false
-        } else idx <= currentIdx
-
+    orderedStates.forEachIndexed { idx, state ->
+        val isCompleted = if (currentIdx == -1) idx < orderedStates.size - 1 else idx <= currentIdx
         result.add(TaskLifecycleStep(
-            label = label,
-            protocolState = s,
-            isCompleted = isCompleted,
-            isCurrent = s == task.status
+            label        = labels[state] ?: state,
+            protocolState = state,
+            isCompleted  = isCompleted,
+            isCurrent    = state == task.status,
+            timestamp    = null
         ))
     }
-    
-    // Add terminal state if not DONE
+
     if (task.status == "FAILED" || task.status == "CANCELLED") {
         result.add(TaskLifecycleStep(
-            label = labels[task.status] ?: task.status,
+            label        = labels[task.status] ?: task.status,
             protocolState = task.status,
-            isCompleted = true,
-            isCurrent = true,
-            isError = task.status == "FAILED"
+            isCompleted  = true,
+            isCurrent    = true,
+            isError      = task.status == "FAILED"
         ))
     }
-
     return result
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+private fun isTerminal(status: String) =
+    status in setOf("DONE", "FAILED", "CANCELLED")
+
+/** Trim ISO timestamp to readable local format (no TZ math, just strip the T/Z) */
+private fun formatTimestamp(ts: String): String =
+    ts.replace("T", " ").take(19)

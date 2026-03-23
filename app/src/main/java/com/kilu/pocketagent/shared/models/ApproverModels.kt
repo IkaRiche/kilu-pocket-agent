@@ -14,6 +14,83 @@ data class ApproverTaskItem(
     val final_report: String? = null
 )
 
+// ── Full task detail — maps GET /v1/tasks/:id exactly ──────────────────────
+
+@Serializable
+data class TaskEvidence(
+    val task_id: String? = null,
+    val step_id: String? = null,
+    val runner_id: String? = null,
+    val adapter: String? = null,
+    val outcome: String? = null,
+    val started_at: String? = null,
+    val finished_at: String? = null,
+    val exit_code: Int? = null,
+    val stdout_hash: String? = null,
+    val stdout_truncated: Boolean? = null,
+    val timeout: Boolean? = null,
+    val cancelled: Boolean? = null
+)
+
+@Serializable
+data class TaskResult(
+    val url: String? = null,
+    val final_url: String? = null,
+    val summary: String? = null,
+    val headings: List<String>? = null,
+    val content_type: String? = null,
+    val extracted_text_preview: String? = null
+)
+
+@Serializable
+data class TaskResultPayload(
+    val evidence: TaskEvidence? = null,
+    val result: TaskResult? = null
+)
+
+@Serializable
+data class TaskFailure(
+    val code: String? = null,
+    val message: String? = null
+)
+
+@Serializable
+data class TaskDetail(
+    val task_id: String,
+    val tenant_id: String? = null,
+    val status: String,
+    val title: String? = null,
+    val user_prompt: String? = null,
+    val executor_preference: String? = null,
+    val target_runtime_id: String? = null,
+    val plan_id: String? = null,
+    val active_grant_id: String? = null,
+    val planner_mode: String? = null,
+    val result: TaskResultPayload? = null,
+    val failure: TaskFailure? = null,
+    val version: Int? = null,
+    val created_at: String? = null,
+    val updated_at: String? = null
+) {
+    /** Duration in ms between evidence started_at and finished_at, or null if unavailable */
+    fun executionDurationMs(): Long? {
+        val s = result?.evidence?.started_at ?: return null
+        val f = result.evidence.finished_at ?: return null
+        return try {
+            val fmt = java.time.format.DateTimeFormatter.ISO_DATE_TIME
+            val start = java.time.Instant.from(fmt.parse(s))
+            val end   = java.time.Instant.from(fmt.parse(f))
+            java.time.Duration.between(start, end).toMillis()
+        } catch (_: Exception) { null }
+    }
+
+    /** Short human-readable duration string, e.g. "1.28 s" */
+    fun durationLabel(): String? = executionDurationMs()?.let {
+        if (it < 1000) "${it}ms" else "${"%.2f".format(it / 1000.0)}s"
+    }
+}
+
+
 @Serializable
 data class CreateTaskReq(
     val title: String,

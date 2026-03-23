@@ -395,6 +395,35 @@ class ControlPlaneApi(
             } catch (e: Exception) { null }
         }
 
+    /** Full task detail — returns TaskDetail with result, failure, runtime info. */
+    suspend fun getTaskDetail(taskId: String): TaskDetail? =
+        withContext(Dispatchers.IO) {
+            try {
+                val req = Request.Builder().url("$baseUrl/tasks/$taskId").get().build()
+                client.newCall(req).execute().use { resp ->
+                    when {
+                        resp.isSuccessful -> {
+                            val body = resp.body?.string() ?: ""
+                            json.decodeFromString<TaskDetail>(body)
+                        }
+                        resp.code == 401 || resp.code == 403 -> {
+                            logger.e("ControlPlaneApi", "getTaskDetail auth error ${resp.code}")
+                            onAuthFailure?.invoke()
+                            null
+                        }
+                        else -> {
+                            logger.e("ControlPlaneApi", "getTaskDetail http=${resp.code}")
+                            null
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                logger.e("ControlPlaneApi", "getTaskDetail error", e)
+                null
+            }
+        }
+
+
     /**
      * Hub heartbeat — keeps hub_runtimes.status=ONLINE and last_seen_at fresh.
      * Called once at loop startup and every 5 min thereafter.
