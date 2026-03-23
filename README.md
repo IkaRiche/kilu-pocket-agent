@@ -1,68 +1,93 @@
-# kilu-pocket-agent
+# KiLu Pocket Agent
 
-**kilu-pocket-agent is the Android authority device and validation runtime for KiLu's approval-bound execution model.**
+Android authority device and validation runtime for KiLu's approval-bound execution model.
 
-It demonstrates live split-trust execution: human approval via biometrics, runtime-bound grants, and evidence-backed task completion. Broader production execution is expected to evolve through Linux/gateway runtimes and external agent integrations.
+KiLu Pocket Agent demonstrates a live split-trust architecture in which planning and task creation can happen outside the device, but execution authority remains bound to explicit human approval, runtime-scoped grants, and evidence-backed completion.
 
-> KiLu separates *authority* from *execution*:  
-> **Approver** holds keys and confirms intent with biometrics.  
-> **Hub** executes in a constrained sandbox — only what it was explicitly granted.  
-> **Control Plane** issues single-use capability tokens and enforces deterministic policy.
+This repository contains the Android components of that model:
 
----
+- **Android Approver** — the human authority device
+- **Android Hub** — the Android validation/runtime wedge for controlled execution
 
-## Current Status — R2 ✅
-
-**2026-03-23 — device-verified.**
-
-| Milestone | Status | Date |
-|---|---|---|
-| R1 — E2E baseline confirmed | ✅ Closed | 2026-03-23 |
-| R2 — TaskDetailScreen (4-section evidence view) | ✅ Device-verified | 2026-03-23 |
-| Live E2E smoke test (3/3 runs) | ✅ Confirmed | 2026-03-23 |
-| Android runtime | ✅ Validated | Validation/wedge role |
-| Linux/gateway runtime | 🔲 Planned | Production execution path |
-
-**Full operator cycle proven:**  
-Task creation → human approval → runtime-bound execution → evidence result → DONE notification → TaskDetail evidence view.
+It is not the whole KiLu platform. The canonical operational system spans multiple repositories, with `KiLu-Network` acting as the main control-plane and ecosystem workspace.
 
 ---
 
-## What This Repo Contains
+## Current Status
 
-| Component | Role | Status |
-|---|---|---|
-| **Android Approver** | Human authority device — biometric approval, Ed25519 keys, AVO review | ✅ Live |
-| **Android Hub** | Validation runtime — bounded HTML fetch, step-token execution, evidence submission | ✅ Live (validation) |
-| **TaskDetailScreen** | Evidence view — url, summary, headings, runtime_id, execution timeline | ✅ R2 device-verified |
+**Current phase:** R2 — Android Wedge Packaging  
+**R1 status:** Closed on 2026-03-23  
+**R2 focus:** honest Android validation scope, evidence visibility, and wedge packaging
 
----
+What has been proven on a live runtime:
 
-## Scope Clarification
-
-**Android Approver** is a production-grade authority device. It holds non-exportable Ed25519 keys in Android Keystore, presents canonical AVO review cards, and issues biometric-signed approval receipts. This role is designed for permanent use.
-
-**Android Hub** is a validation runtime. It proves the execution model works end-to-end on a constrained device: bounded HTML fetch, adapter-based toolchain, step-token validation, evidence generation. It is **not** positioned as the final production executor for broad or compute-heavy workloads.
-
-**Production execution direction** is Linux Hub and gateway runtimes — where network access, process isolation, and resource limits can be properly managed.
-
-**kilu-sdk** ([`@kilu/sdk`](https://github.com/IkaRiche/kilu-sdk)) is the public TypeScript integration surface. It is live — not a future plan.
-
-**KiLu-Network** is the canonical private monorepo: Control Plane, Telegram Bot, governance docs, phase tracking.
+- QR pairing between Approver and Hub
+- runtime-bound grants and approval-gated execution
+- end-to-end task flow: create → approve → execute → DONE
+- Telegram DONE notifications with human-readable result preview
+- TaskDetailScreen with real task result, execution facts, and evidence preview
 
 ---
 
-## What KiLu Is
+## Recent Milestones
 
-KiLu is an **authority fabric** for agentic execution:
+- R1-final closed: clean D1 lifecycle, stable runtime heartbeat, control E2E confirmed
+- Telegram DONE notifications confirmed on live tasks
+- TaskDetailScreen implemented and device-verified with real evidence-backed task data
+- ecosystem docs aligned across KiLu-Network, kilu-pocket-agent, and kilu-sdk
 
-- **Grants** — structured, time-bounded permission objects
-- **Runtime binding** — execution is cryptographically tied to a specific device
-- **Human approval** — biometric signature required before any step runs
-- **Constrained execution** — Hub refuses without valid capability token
-- **Evidence** — every outcome is hash-bound and auditable
+---
 
-> KiLu does **not** rely on "trust the model". It relies on **cryptographic constraints**.
+## What This Repository Is
+
+This repository is the **Android reference implementation** of KiLu's approval-bound execution model.
+
+It is the place where KiLu's core ideas are made visible on-device:
+
+- human approval as a first-class authority primitive
+- runtime-bound execution instead of free-floating agent autonomy
+- fail-closed behavior when authority or bindings do not match
+- evidence-aware task completion rather than opaque background execution
+
+---
+
+## What This Repository Is Not
+
+This repository should **not** be read as the entire KiLu platform, and it should **not** be interpreted as claiming that Android is the final production runtime for broad agent workloads.
+
+More precisely:
+
+- **Android Approver** is the authority device
+- **Android Hub** is the current validation/runtime wedge
+- broader production execution is expected to evolve through Linux/gateway runtimes and external agent integrations
+- public integration for external agents belongs to the KiLu SDK and related control-plane repos
+
+---
+
+## Proven Validation Scope
+
+The Android path is now validated for:
+
+- approval-gated task execution
+- runtime-bound execution targeting
+- result + evidence return to the control plane
+- human-visible completion via Telegram
+- on-device task inspection through TaskDetailScreen
+
+This means the Android wedge is already useful as a live validation surface and reference implementation.
+
+It does **not** mean that the Android Hub is presented as the final answer for all future execution environments.
+
+---
+
+## Repository Role in the KiLu Ecosystem
+
+This repository is best understood as:
+
+- **Authority device:** Android Approver
+- **Validation/runtime wedge:** Android Hub
+- **Reference UX surface:** approval, task state, evidence preview
+- **Demonstration vehicle:** the most concrete public proof of KiLu's split-trust architecture
 
 ---
 
@@ -104,20 +129,6 @@ flowchart LR
 3. **Tamper-evident** — every output is bound to evidence hashes and receipts.
 
 See [GUARANTEES.md](GUARANTEES.md).
-
----
-
-## Confirmed Baseline — 2026-03-23
-
-**Smoke test:** 3 consecutive runs — no D1 edits, no restarts, no re-pairing.
-
-| Run | Site | DONE |
-|-----|------|------|
-| 1 | klimacoach.com | ✅ |
-| 2 | orf.at | ✅ |
-| 3 | bbc.com | ✅ |
-
-Baseline tag: `r1-core-stable-2026-03-23`
 
 ---
 
@@ -171,7 +182,6 @@ An `ApprovalReceipt` binds:
 
 ## Governance & Project Status
 
-This repository is the **Android authority layer** of KiLu.  
 Project-level governance and phase tracking live in the canonical repository:
 
 | Document | Location |
@@ -180,17 +190,31 @@ Project-level governance and phase tracking live in the canonical repository:
 | KNOWN_GOOD_BASELINES.md | [KiLu-Network/KNOWN_GOOD_BASELINES.md](https://github.com/IkaRiche/KiLu-Network/blob/main/KNOWN_GOOD_BASELINES.md) |
 | GOVERNANCE.md | [KiLu-Network/GOVERNANCE.md](https://github.com/IkaRiche/KiLu-Network/blob/main/GOVERNANCE.md) |
 
-**Current phase:** R2 — Android Wedge Packaging  
-**R1 closed:** ✅ 2026-03-23 — E2E 3/3 confirmed, D1 cleaned, `registerRuntime` fixed  
-**R2:** ✅ TaskDetailScreen device-verified — 4-section evidence view (url / summary / headings / runtime timeline)
-
 ---
 
 ## Related Repositories
 
-- [KiLu-Network](https://github.com/IkaRiche/KiLu-Network) — Control Plane, Telegram Bot, governance docs, phase tracking (canonical operational repo)
-- [kilu-sdk](https://github.com/IkaRiche/kilu-sdk) — TypeScript SDK: `KiluClient`, `submitIntent`, `verifyReceipt` (`@kilu/sdk`) — live, not planned
-- [KiLu](https://github.com/IkaRiche/KiLu) — DeTAK (Deterministic Transaction & Authority Kernel) — protocol core
+- **[KiLu-Network](https://github.com/IkaRiche/KiLu-Network)** — canonical operational repo for the control plane, Telegram bot, bridge logic, lifecycle docs, and ecosystem governance
+- **[kilu-sdk](https://github.com/IkaRiche/kilu-sdk)** — public TypeScript SDK for integrating external planners and agents into KiLu's authority model (`@kilu/sdk`, `KiluClient`, `submitIntent`, `verifyReceipt`)
+- **[KiLu](https://github.com/IkaRiche/KiLu)** — DeTAK (Deterministic Transaction & Authority Kernel) — protocol and authority primitives
+
+---
+
+## Practical Reading Guide
+
+If you are trying to understand the project quickly:
+
+- read this repository to understand the Android authority device and validation runtime
+- read `KiLu-Network` to understand the live operational flow
+- read `kilu-sdk` to understand the external integration surface
+
+---
+
+## Core Thesis
+
+Agents may plan.  
+KiLu authorizes.  
+Execution happens only within explicit, runtime-bound, human-approved limits.
 
 ---
 
