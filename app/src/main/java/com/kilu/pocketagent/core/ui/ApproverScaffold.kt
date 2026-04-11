@@ -33,7 +33,8 @@ fun ApproverScaffold(
     onPairHub: () -> Unit,
     onDiagnostics: () -> Unit,
     onResetPairing: () -> Unit,
-    onSwitchRole: () -> Unit
+    onSwitchRole: () -> Unit,
+    onWorkflowGrantClick: (String) -> Unit = {},
 ) {
     var selectedTab by remember { mutableStateOf(ApproverTab.TASKS) }
 
@@ -79,7 +80,8 @@ fun ApproverScaffold(
                 onNewTaskClick = onNewTaskClick,
                 onTaskClick = onTaskClick,
                 onInboxClick = onInboxClick,
-                onPairHub = { selectedTab = ApproverTab.DEVICES }
+                onPairHub = { selectedTab = ApproverTab.DEVICES },
+                onWorkflowGrantClick = onWorkflowGrantClick
             )
             ApproverTab.DEVICES -> DevicesScreen(
                 store = store,

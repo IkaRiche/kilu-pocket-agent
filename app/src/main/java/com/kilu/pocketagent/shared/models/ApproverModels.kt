@@ -9,9 +9,10 @@ data class ApproverTaskItem(
     val title: String? = null,
     val user_prompt: String? = null,
     val status: String,
-    val created_at: String,
+    val created_at: String? = null,
     val final_report_status: String? = "PENDING",
-    val final_report: String? = null
+    val final_report: String? = null,
+    val active_grant_id: String? = null,  // E3.2 Phase B: set when task is under a workflow grant
 )
 
 // ── Full task detail — maps GET /v1/tasks/:id exactly ──────────────────────
