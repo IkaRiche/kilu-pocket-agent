@@ -15,9 +15,9 @@ It is not the whole KiLu platform. The canonical operational system spans multip
 
 ## Current Status
 
-**Current phase:** R2 — Android Wedge Packaging  
-**R1 status:** Closed on 2026-03-23  
-**R2 focus:** honest Android validation scope, evidence visibility, and wedge packaging
+**Current phase:** E3.2 — Workflow Grant Orchestration  
+**E3.2 Phase B status:** ✅ COMPLETE (2026-04-11)  
+**Proven:** B9 (happy path) + B10 (revoke path) — both live-verified on device
 
 What has been proven on a live runtime:
 
@@ -26,15 +26,22 @@ What has been proven on a live runtime:
 - end-to-end task flow: create → approve → execute → DONE
 - Telegram DONE notifications with human-readable result preview
 - TaskDetailScreen with real task result, execution facts, and evidence preview
+- **[E3.2-B] Real CP-backed workflow grants with one-tap Android APPROVE ALL**
+- **[E3.2-B] Sealed `workflow_ref` with server-side tamper detection**
+- **[E3.2-B] Atomic `PLANNING → READY_FOR_EXECUTION` for all tasks on approve**
+- **[E3.2-B] Revoke-on-failure: bridge revokes grant, remaining steps do not execute**
 
 ---
 
 ## Recent Milestones
 
+- **E3.2 Phase B COMPLETE** (2026-04-11) — Real workflow grant, one-tap approval, revoke proof
 - R1-final closed: clean D1 lifecycle, stable runtime heartbeat, control E2E confirmed
 - Telegram DONE notifications confirmed on live tasks
 - TaskDetailScreen implemented and device-verified with real evidence-backed task data
 - ecosystem docs aligned across KiLu-Network, kilu-pocket-agent, and kilu-sdk
+
+See [E3_2_PHASE_B_MILESTONE.md](E3_2_PHASE_B_MILESTONE.md) for full proof record.
 
 ---
 
@@ -61,6 +68,7 @@ More precisely:
 - **Android Hub** is the current validation/runtime wedge
 - broader production execution is expected to evolve through Linux/gateway runtimes and external agent integrations
 - public integration for external agents belongs to the KiLu SDK and related control-plane repos
+- multi-hub routing and partial retry are **not** part of the current scope
 
 ---
 
@@ -73,6 +81,8 @@ The Android path is now validated for:
 - result + evidence return to the control plane
 - human-visible completion via Telegram
 - on-device task inspection through TaskDetailScreen
+- **workflow grant: one-tap atomic approval of a pre-sealed multi-step workflow**
+- **workflow grant: revoke-on-failure — no continued execution after step failure**
 
 This means the Android wedge is already useful as a live validation surface and reference implementation.
 
@@ -98,6 +108,7 @@ flowchart LR
   subgraph Cloud["☁️ Control Plane (policy + issuance)"]
     P1["Token Minting\nStepToken(JTI, exp, bindings)"]
     P2["Audit Store\n(receipts, evidence hashes)"]
+    P3["Workflow Grant\nwfg_ sealed authority"]
   end
 
   subgraph Hub["📱 Hub (Executor)"]
@@ -111,6 +122,7 @@ flowchart LR
     A2["Biometric Gate"]
     A3["AVO Review Card\ncanonical plan"]
     A4["Signed Approval Receipt"]
+    A5["APPROVE ALL\nWorkflow Grant"]
   end
 
   P1 -->|StepToken batch| H2
@@ -118,15 +130,19 @@ flowchart LR
   H3 -->|evidence hash| P2
   P2 -->|AVO request| A3
   A3 --> A2 --> A4 -->|approval receipt| P2
+  P3 -->|pending grant| A5
+  A5 -->|one-tap approve| P3
+  P3 -->|READY_FOR_EXECUTION| H1
 ```
 
 ---
 
-## Three Guarantees
+## Four Guarantees
 
-1. **Fail-closed** — without a valid StepToken, Hub refuses execution.
+1. **Fail-closed** — without a valid StepToken or workflow grant, Hub refuses execution.
 2. **Replay-proof** — each capability is single-use (JTI) and time-bounded (exp).
 3. **Tamper-evident** — every output is bound to evidence hashes and receipts.
+4. **Revoke-on-failure** — a mid-workflow step failure revokes the grant; remaining steps do not execute.
 
 See [GUARANTEES.md](GUARANTEES.md).
 
