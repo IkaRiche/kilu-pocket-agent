@@ -71,16 +71,20 @@ fun ApproverTasksHomeScreen(
             val result = controlPlane.getTasks(20)
             if (result != null) {
                 tasks = result
-                // Surface PLANNING tasks that have an active workflow grant as pending-approval items
-                val planningTasks = result.filter { it.status == "PLANNING" }
-                pendingGrants = if (planningTasks.isNotEmpty()) {
-                    planningTasks
+                // Surface PLANNING tasks that have workflow_grant_id (Phase B) as pending-approval items.
+                // NOTE: workflow_grant_id (wfg_ prefix) is the Phase B field.
+                //       active_grant_id (grt_ prefix) is the legacy per-step field — do NOT use for workflow grants.
+                val planningWithGrant = result.filter {
+                    it.status == "PLANNING" && it.workflow_grant_id != null
+                }
+                pendingGrants = if (planningWithGrant.isNotEmpty()) {
+                    planningWithGrant
                         .mapNotNull { t ->
-                            val gid = t.active_grant_id ?: return@mapNotNull null
+                            val gid = t.workflow_grant_id ?: return@mapNotNull null
                             WorkflowGrantListItem(
                                 grant_id = gid,
                                 status = "active",
-                                total_steps = planningTasks.size,
+                                total_steps = planningWithGrant.count { it.workflow_grant_id == gid },
                                 target_runtime_id = "",
                                 expires_at = "",
                                 created_at = t.created_at,
@@ -208,6 +212,8 @@ fun ApproverTasksHomeScreen(
             }
 
             // ── Pending Workflow Grants (E3.2 Phase B) ──
+            // Shows when tasks have workflow_grant_id (wfg_ prefix), meaning they're awaiting
+            // one-tap APPROVE ALL before the bridge can execute them atomically.
             if (pendingGrants.isNotEmpty()) {
                 KiluSectionHeader(label = "Workflow Grants (${pendingGrants.size} pending approval)")
                 pendingGrants.forEach { grant ->
@@ -236,7 +242,7 @@ fun ApproverTasksHomeScreen(
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                                 Text(
-                                    "${grant.total_steps} steps pending approval",
+                                    "${grant.total_steps} step${if (grant.total_steps != 1) "s" else ""} pending approval",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
@@ -306,9 +312,18 @@ fun ApproverTasksHomeScreen(
                                     }
                                 }
                             ) {
+                                // PLANNING tasks with workflow_grant_id -> route to WorkflowGrantDetailScreen
+                                // All other tasks -> route to PlanPreviewScreen or TaskDetailScreen
+                                val grantId = task.workflow_grant_id
                                 TaskCard(
                                     task = task,
-                                    onClick = { onTaskClick(task.task_id, task.status) }
+                                    onClick = {
+                                        if (grantId != null && task.status == "PLANNING") {
+                                            onWorkflowGrantClick(grantId)
+                                        } else {
+                                            onTaskClick(task.task_id, task.status)
+                                        }
+                                    }
                                 )
                             }
                         }
