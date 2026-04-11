@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Refresh
@@ -18,21 +19,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.kilu.pocketagent.core.network.ApiClient
+import com.kilu.pocketagent.core.network.ControlPlaneApi
 import com.kilu.pocketagent.core.ui.components.EmptyState
 import com.kilu.pocketagent.core.ui.components.KiluSectionHeader
 import com.kilu.pocketagent.core.ui.components.KiluStatBadge
-import com.kilu.pocketagent.core.ui.components.StatusChip
 import com.kilu.pocketagent.core.ui.components.TaskCard
 import com.kilu.pocketagent.core.ui.theme.StatusApproved
 import com.kilu.pocketagent.core.ui.theme.StatusPending
 import com.kilu.pocketagent.shared.models.ApproverTaskItem
 import com.kilu.pocketagent.shared.models.QuotasResp
-import com.kilu.pocketagent.shared.utils.ErrorHandler
-import kotlinx.coroutines.Dispatchers
+import com.kilu.pocketagent.shared.models.WorkflowGrantListItem
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
-import com.kilu.pocketagent.core.network.ControlPlaneApi
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,14 +39,16 @@ fun ApproverTasksHomeScreen(
     onNewTaskClick: () -> Unit,
     onTaskClick: (String, String) -> Unit,
     onInboxClick: () -> Unit,
-    onPairHub: () -> Unit
+    onPairHub: () -> Unit,
+    onWorkflowGrantClick: (String) -> Unit = {},
 ) {
     var tasks by remember { mutableStateOf<List<ApproverTaskItem>>(emptyList()) }
+    var pendingGrants by remember { mutableStateOf<List<WorkflowGrantListItem>>(emptyList()) }
     var quotas by remember { mutableStateOf<QuotasResp?>(null) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var taskToDelete by remember { mutableStateOf<ApproverTaskItem?>(null) }
-    
+
     val scope = rememberCoroutineScope()
     val controlPlane = remember {
         ControlPlaneApi(apiClient.client, apiClient.apiUrl("")) {
@@ -72,6 +71,25 @@ fun ApproverTasksHomeScreen(
             val result = controlPlane.getTasks(20)
             if (result != null) {
                 tasks = result
+                // Surface PLANNING tasks that have an active workflow grant as pending-approval items
+                val planningTasks = result.filter { it.status == "PLANNING" }
+                pendingGrants = if (planningTasks.isNotEmpty()) {
+                    planningTasks
+                        .mapNotNull { t ->
+                            val gid = t.active_grant_id ?: return@mapNotNull null
+                            WorkflowGrantListItem(
+                                grant_id = gid,
+                                status = "active",
+                                total_steps = planningTasks.size,
+                                target_runtime_id = "",
+                                expires_at = "",
+                                created_at = t.created_at,
+                            )
+                        }
+                        .distinctBy { it.grant_id }
+                } else {
+                    emptyList()
+                }
             } else {
                 errorMsg = "Failed to load tasks."
             }
@@ -95,7 +113,6 @@ fun ApproverTasksHomeScreen(
         }
     }
 
-
     // Delete confirmation dialog
     taskToDelete?.let { task ->
         AlertDialog(
@@ -114,7 +131,6 @@ fun ApproverTasksHomeScreen(
         )
     }
 
-    // Count stats
     val activeCount = tasks.count { it.status in listOf("READY_FOR_EXECUTION", "EXECUTING") }
     val pendingCount = tasks.count { it.status in listOf("NEEDS_PLAN_APPROVAL", "PLANNING") }
     val doneCount = tasks.count { it.status == "DONE" }
@@ -155,9 +171,7 @@ fun ApproverTasksHomeScreen(
             // ── Stats Row ──
             quotas?.let { q ->
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     KiluStatBadge("Active", "$activeCount", MaterialTheme.colorScheme.tertiary, Modifier.weight(1f))
@@ -193,6 +207,54 @@ fun ApproverTasksHomeScreen(
                 }
             }
 
+            // ── Pending Workflow Grants (E3.2 Phase B) ──
+            if (pendingGrants.isNotEmpty()) {
+                KiluSectionHeader(label = "Workflow Grants (${pendingGrants.size} pending approval)")
+                pendingGrants.forEach { grant ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        ),
+                        onClick = { onWorkflowGrantClick(grant.grant_id) }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp).fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "WORKFLOW GRANT",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    grant.grant_id.take(18) + "\u2026",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                Text(
+                                    "${grant.total_steps} steps pending approval",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                            Button(
+                                onClick = { onWorkflowGrantClick(grant.grant_id) },
+                                colors = ButtonDefaults.buttonColors(containerColor = StatusApproved),
+                                modifier = Modifier.padding(start = 8.dp)
+                            ) {
+                                Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Review", color = Color.White, style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                    }
+                }
+            }
+
             // ── Task List ──
             KiluSectionHeader(label = "Tasks")
             if (isLoading) {
@@ -207,7 +269,7 @@ fun ApproverTasksHomeScreen(
                     if (tasks.isEmpty()) {
                         item {
                             EmptyState(
-                                icon = "📋",
+                                icon = "\uD83D\uDCCB",
                                 title = "No tasks yet",
                                 subtitle = "Tap + to create your first task"
                             )
@@ -219,7 +281,7 @@ fun ApproverTasksHomeScreen(
                                     if (value == SwipeToDismissBoxValue.EndToStart) {
                                         taskToDelete = task
                                     }
-                                    false // Don't auto-dismiss; show dialog first
+                                    false
                                 }
                             )
                             SwipeToDismissBox(
