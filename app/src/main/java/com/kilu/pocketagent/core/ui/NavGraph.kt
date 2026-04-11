@@ -19,6 +19,7 @@ import com.kilu.pocketagent.features.pairing.DiagnosticsScreen
 import com.kilu.pocketagent.features.pairing.HubScanScreen
 import com.kilu.pocketagent.features.pairing.HubOfferDetailsScreen
 import com.kilu.pocketagent.shared.models.QRPayload
+import com.kilu.pocketagent.features.approver.WorkflowGrantDetailScreen
 
 @Composable
 fun NavGraph() {
@@ -27,8 +28,7 @@ fun NavGraph() {
     val store = remember { DeviceProfileStore(context) }
     val apiClient = remember { ApiClient(store) }
     var scannedPayload by remember { mutableStateOf<QRPayload?>(null) }
-    
-    // Gate: determine start destination
+
     val startDestination = when {
         store.getRole() == null -> "welcome"
         store.getRole() == Role.APPROVER && store.getSessionToken() != null -> "approver_home"
@@ -40,214 +40,141 @@ fun NavGraph() {
 
     NavHost(navController = navController, startDestination = startDestination) {
 
-        // ── Onboarding ──
-        composable("welcome") {
-            WelcomeScreen(onContinue = { navController.navigate("role_select") })
-        }
+        composable("welcome") { WelcomeScreen(onContinue = { navController.navigate("role_select") }) }
         composable("role_select") {
-            RoleSelectScreen(
-                store = store,
-                onRoleSelected = { navController.navigate("url_config") }
-            )
+            RoleSelectScreen(store = store, onRoleSelected = { navController.navigate("url_config") })
         }
         composable("url_config") {
             ControlPlaneUrlScreen(
                 store = store,
                 onComplete = {
                     val dest = if (store.getRole() == Role.APPROVER) "approver_register" else "hub_unpaired"
-                    navController.navigate(dest) {
-                        popUpTo("welcome") { inclusive = true }
-                    }
+                    navController.navigate(dest) { popUpTo("welcome") { inclusive = true } }
                 }
             )
         }
 
-        // ── Approver: Unpaired ──
         composable("approver_register") {
             ApproverPairingInitScreen(
-                apiClient = apiClient,
-                store = store,
+                apiClient = apiClient, store = store,
                 onPaired = {
-                    navController.navigate("approver_home") {
-                        popUpTo("approver_register") { inclusive = true }
-                    }
+                    navController.navigate("approver_home") { popUpTo("approver_register") { inclusive = true } }
                 }
             )
         }
 
-        // ── Approver: Paired Home (Tasks) ──
         composable("approver_home") {
             ApproverScaffold(
-                apiClient = apiClient,
-                store = store,
+                apiClient = apiClient, store = store,
                 onSessionInvalid = {
                     store.clearPairing()
-                    navController.navigate("approver_register") {
-                        popUpTo("approver_home") { inclusive = true }
-                    }
+                    navController.navigate("approver_register") { popUpTo("approver_home") { inclusive = true } }
                 },
                 onNewTaskClick = { navController.navigate("approver_new_task") },
-                onTaskClick = { taskId, status -> 
-                    if (status == "NEEDS_PLAN_APPROVAL" || status == "PLANNING") {
-                        navController.navigate("approver_plan/$taskId")
-                    } else {
-                        navController.navigate("approver_task_detail/$taskId")
-                    }
+                onTaskClick = { taskId, status ->
+                    if (status == "NEEDS_PLAN_APPROVAL" || status == "PLANNING") navController.navigate("approver_plan/$taskId")
+                    else navController.navigate("approver_task_detail/$taskId")
                 },
+                onWorkflowGrantClick = { grantId -> navController.navigate("approver_workflow_grant/$grantId") },
                 onInboxClick = { navController.navigate("approver_inbox") },
                 onPairHub = { navController.navigate("hub_pair_init") },
                 onDiagnostics = { navController.navigate("diagnostics") },
                 onResetPairing = {
                     store.clearPairing()
-                    navController.navigate("welcome") {
-                        popUpTo("approver_home") { inclusive = true }
-                    }
+                    navController.navigate("welcome") { popUpTo("approver_home") { inclusive = true } }
                 },
                 onSwitchRole = {
                     store.clearPairing()
-                    navController.navigate("role_select") {
-                        popUpTo("approver_home") { inclusive = true }
-                    }
+                    navController.navigate("role_select") { popUpTo("approver_home") { inclusive = true } }
                 }
             )
         }
 
-        // ── Approver: Generate QR for Hub ──
         composable("hub_pair_init") {
-            HubPairInitScreen(
-                apiClient = apiClient,
-                store = store,
-                onBack = { navController.navigateUp() }
-            )
+            HubPairInitScreen(apiClient = apiClient, store = store, onBack = { navController.navigateUp() })
         }
 
-        // ── Approver: Task Screens ──
         composable("approver_new_task") {
             com.kilu.pocketagent.features.approver.NewTaskScreen(
                 apiClient = apiClient,
-                onCreated = { taskId ->
-                    navController.navigate("approver_plan/$taskId") {
-                        popUpTo("approver_home")
-                    }
-                },
+                onCreated = { taskId -> navController.navigate("approver_plan/$taskId") { popUpTo("approver_home") } },
                 onCancel = { navController.navigateUp() }
             )
         }
         composable("approver_plan/{taskId}") { backStackEntry ->
             val tId = backStackEntry.arguments?.getString("taskId") ?: ""
             com.kilu.pocketagent.features.approver.PlanPreviewScreen(
-                taskId = tId,
-                apiClient = apiClient,
-                onApproved = {
-                    navController.navigate("approver_home") {
-                        popUpTo("approver_home") { inclusive = true }
-                    }
-                },
+                taskId = tId, apiClient = apiClient,
+                onApproved = { navController.navigate("approver_home") { popUpTo("approver_home") { inclusive = true } } },
                 onBack = { navController.navigateUp() }
             )
         }
         composable("approver_task_detail/{taskId}") { backStackEntry ->
             val tId = backStackEntry.arguments?.getString("taskId") ?: ""
             com.kilu.pocketagent.features.approver.TaskDetailScreen(
-                taskId = tId,
-                apiClient = apiClient,
-                onBack = { navController.navigateUp() }
+                taskId = tId, apiClient = apiClient, onBack = { navController.navigateUp() }
             )
         }
         composable("approver_inbox") {
             com.kilu.pocketagent.features.approver.ApproverInboxScreen(
                 apiClient = apiClient,
-                onResolveRequested = { taskId ->
-                    navController.navigate("approver_resolve/$taskId")
-                },
+                onResolveRequested = { taskId -> navController.navigate("approver_resolve/$taskId") },
                 onBack = { navController.navigateUp() }
             )
         }
         composable("approver_resolve/{taskId}") { backStackEntry ->
             val tId = backStackEntry.arguments?.getString("taskId") ?: ""
             com.kilu.pocketagent.features.approver.AssumptionResolutionScreen(
-                taskId = tId,
-                apiClient = apiClient,
-                onResolved = { navController.navigateUp() },
+                taskId = tId, apiClient = apiClient,
+                onResolved = { navController.navigateUp() }, onBack = { navController.navigateUp() }
+            )
+        }
+
+        // E3.2 Phase B — B7: Workflow Grant APPROVE ALL
+        composable("approver_workflow_grant/{grantId}") { backStackEntry ->
+            val gId = backStackEntry.arguments?.getString("grantId") ?: ""
+            WorkflowGrantDetailScreen(
+                grantId = gId, apiClient = apiClient, store = store,
+                onApproved = { navController.navigate("approver_home") { popUpTo("approver_home") { inclusive = true } } },
+                onDenied = { navController.navigateUp() },
                 onBack = { navController.navigateUp() }
             )
         }
 
-        // ── Hub: Unpaired ──
         composable("hub_unpaired") {
             PairingHomeScreen(
-                store = store,
-                apiClient = apiClient,
-                onChangeRole = {
-                    navController.navigate("role_select") {
-                        popUpTo("hub_unpaired") { inclusive = true }
-                    }
-                },
+                store = store, apiClient = apiClient,
+                onChangeRole = { navController.navigate("role_select") { popUpTo("hub_unpaired") { inclusive = true } } },
                 onPairInit = { navController.navigate("hub_scan") },
                 onDiagnostics = { navController.navigate("diagnostics") }
             )
         }
 
-        // ── Hub: Paired Home ──
         composable("hub_home") {
             com.kilu.pocketagent.features.hub.HubDashboardScreen(
                 apiClient = apiClient,
-                onSessionInvalid = {
-                    store.clearPairing()
-                    navController.navigate("hub_unpaired") {
-                        popUpTo("hub_home") { inclusive = true }
-                    }
-                },
-                onResetPairing = {
-                    store.clearPairing()
-                    navController.navigate("hub_unpaired") {
-                        popUpTo("hub_home") { inclusive = true }
-                    }
-                },
-                onSwitchRole = {
-                    store.clearPairing()
-                    navController.navigate("role_select") {
-                        popUpTo("hub_home") { inclusive = true }
-                    }
-                },
+                onSessionInvalid = { store.clearPairing(); navController.navigate("hub_unpaired") { popUpTo("hub_home") { inclusive = true } } },
+                onResetPairing = { store.clearPairing(); navController.navigate("hub_unpaired") { popUpTo("hub_home") { inclusive = true } } },
+                onSwitchRole = { store.clearPairing(); navController.navigate("role_select") { popUpTo("hub_home") { inclusive = true } } },
                 onDiagnostics = { navController.navigate("diagnostics") }
             )
         }
 
-        // ── Hub: Scan & Confirm ──
         composable("hub_scan") {
-            HubScanScreen(
-                onScanSuccess = { payload ->
-                    scannedPayload = payload
-                    navController.navigate("hub_offer_details")
-                }
-            )
+            HubScanScreen(onScanSuccess = { payload -> scannedPayload = payload; navController.navigate("hub_offer_details") })
         }
         composable("hub_offer_details") {
             val payload = scannedPayload
             if (payload != null) {
                 HubOfferDetailsScreen(
-                    payload = payload,
-                    apiClient = apiClient,
-                    store = store,
-                    onPaired = {
-                        navController.navigate("hub_home") {
-                            popUpTo("hub_unpaired") { inclusive = true }
-                        }
-                    }
+                    payload = payload, apiClient = apiClient, store = store,
+                    onPaired = { navController.navigate("hub_home") { popUpTo("hub_unpaired") { inclusive = true } } }
                 )
-            } else {
-                Text("Error: No Payload")
-            }
+            } else { Text("Error: No Payload") }
         }
 
-        // ── Shared: Diagnostics ──
         composable("diagnostics") {
-            DiagnosticsScreen(
-                apiClient = apiClient,
-                store = store,
-                onBack = { navController.navigateUp() }
-            )
+            DiagnosticsScreen(apiClient = apiClient, store = store, onBack = { navController.navigateUp() })
         }
     }
 }
