@@ -50,6 +50,7 @@ android {
             buildConfigField("String", "SERVER_KID", "\"dev_key_1\"")
             buildConfigField("String", "SERVER_PUBKEY_B64", "\"e8MHlRjtEdoDNghb9pYpIP+H+zxNYwqbWMthU2dPXdY=\"")
             buildConfigField("boolean", "ENFORCE_HTTPS", "false")
+            buildConfigField("String", "HEARTBEAT_SECRET", "\"\"")  // empty = no-op in dev
             applicationIdSuffix = ".dev"
         }
         create("prod") {
@@ -58,6 +59,9 @@ android {
             buildConfigField("String", "SERVER_KID", "\"prod_key_1\"")
             buildConfigField("String", "SERVER_PUBKEY_B64", "\"e8MHlRjtEdoDNghb9pYpIP+H+zxNYwqbWMthU2dPXdY=\"")
             buildConfigField("boolean", "ENFORCE_HTTPS", "true")
+            // Secret injected at build time from CI env — never hardcoded here
+            buildConfigField("String", "HEARTBEAT_SECRET",
+                "\"${System.getenv("HEARTBEAT_SECRET") ?: ""}\"")
         }
     }
 
