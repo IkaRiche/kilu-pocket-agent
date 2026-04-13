@@ -64,6 +64,8 @@ jobs:
           KILU_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KILU_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           KILU_RELEASE_STORE_TYPE: "JKS"
+          # U1-C1: operator observability heartbeat secret (baked into prod BuildConfig)
+          HEARTBEAT_SECRET: ${{ secrets.HEARTBEAT_SECRET }}
         run: ./gradlew clean :app:assembleProdRelease
 
       - name: Generate Checksums and Prepare Artifacts
