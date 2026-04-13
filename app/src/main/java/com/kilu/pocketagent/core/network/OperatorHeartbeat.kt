@@ -5,9 +5,11 @@ import com.kilu.pocketagent.BuildConfig
 import com.kilu.pocketagent.core.storage.DeviceProfileStore
 import com.kilu.pocketagent.core.storage.Role
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -58,7 +60,9 @@ object OperatorHeartbeat {
 
         scope.launch {
             while (isActive) {
-                sendPing(store, secret)
+                // Must run on IO dispatcher — OkHttp.execute() is blocking;
+                // lifecycleScope defaults to Dispatchers.Main which forbids network.
+                withContext(Dispatchers.IO) { sendPing(store, secret) }
                 delay(INTERVAL_MS)
             }
         }
