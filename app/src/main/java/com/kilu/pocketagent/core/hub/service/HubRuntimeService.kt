@@ -68,6 +68,9 @@ class HubRuntimeService : LifecycleService() {
                 updateNotification(msg, state.name)
             }
         }
+
+        // Start operator observability heartbeat (no-op if HEARTBEAT_SECRET is blank)
+        com.kilu.pocketagent.core.network.OperatorHeartbeat.startLoop(lifecycleScope, store)
         
         loopJob = lifecycleScope.launch {
             loop.startLoop { isRunning && !isPaused }
