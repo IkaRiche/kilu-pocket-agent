@@ -285,7 +285,7 @@ class ControlPlaneApi(
             try {
                 val req = Request.Builder()
                     .url("$baseUrl/tasks/$taskId/plan")
-                    .post("{\"planner_mode\": \"managed\"}".toRequestBody(mediaTypeJson))
+                    .post("{\"planner_mode\": \"managed\", \"approval_profile\": \"action_v2\"}".toRequestBody(mediaTypeJson))
                     .build()
                 client.newCall(req).execute().use { resp ->
                     when {
