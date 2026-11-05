@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import com.kilu.pocketagent.core.crypto.BiometricGate
 import com.kilu.pocketagent.core.crypto.KeyManager
+import com.kilu.pocketagent.core.crypto.ActionApprovalV2
 import com.kilu.pocketagent.core.network.ApiClient
 import com.kilu.pocketagent.core.storage.DeviceProfileStore
 import com.kilu.pocketagent.core.storage.Role
@@ -46,6 +47,24 @@ fun PlanPreviewScreen(
     val keyManager = remember { KeyManager(context) }
     val deviceStore = remember { DeviceProfileStore(context) }
     val scrollState = rememberScrollState()
+
+    // Fail closed for any legacy/missing/changed action binding in this
+    // opt-in CREG-003 client. Existing released APK v0.9.39 is untouched.
+    val actionBindingError = planData?.let { p ->
+        try {
+            require(p.approval_protocol == ActionApprovalV2.PROTOCOL) {
+                "Plan does not carry KILU_APPROVAL_V2; regenerate with a paired Hub."
+            }
+            require(!p.avo_hash.isNullOrBlank() && !p.runtime_id.isNullOrBlank()
+                    && !p.toolchain_id.isNullOrBlank()) {
+                "Plan has incomplete AVO / runtime / toolchain binding."
+            }
+            ActionApprovalV2.requireActionBinding(p.action_payload_json, p.action_digest)
+            ActionApprovalV2.message(p.plan_id,p.avo_hash,p.action_digest!!,p.runtime_id,p.toolchain_id)
+            null
+        } catch (err: Exception) { err.message ?: "Unverifiable action binding" }
+    }
+
 
     LaunchedEffect(taskId) {
         try {
@@ -87,7 +106,7 @@ fun PlanPreviewScreen(
                     TextButton(onClick = onBack, enabled = !isApproving, modifier = Modifier.weight(1f)) {
                         Text("Cancel")
                     }
-                    if (planData != null && errorMsg == null) {
+                    if (planData != null && errorMsg == null && actionBindingError == null) {
                             KiluPrimaryButton(
                                 text = if (isApproving) "Signing…" else "Confirm",
                                 onClick = {
@@ -106,15 +125,26 @@ fun PlanPreviewScreen(
                                                 return@launch
                                             }
 
-                                            val message = "receipt:${planData!!.plan_id}"
-                                            val sig = keyManager.sign(Role.APPROVER, message.toByteArray())
+                                            // Revalidate the very same fully displayed bytes
+                                            // after biometric approval and before signing.
+                                            val visiblePlan = planData ?: throw IllegalStateException("Plan disappeared")
+                                            ActionApprovalV2.requireActionBinding(visiblePlan.action_payload_json,visiblePlan.action_digest)
+                                            val message = ActionApprovalV2.message(
+                                                visiblePlan.plan_id,
+                                                requireNotNull(visiblePlan.avo_hash),
+                                                requireNotNull(visiblePlan.action_digest),
+                                                requireNotNull(visiblePlan.runtime_id),
+                                                requireNotNull(visiblePlan.toolchain_id)
+                                            )
+                                            val sig = keyManager.sign(Role.APPROVER, message)
                                             val pub = keyManager.publicKey(Role.APPROVER)
                                             val deviceId = deviceStore.getDeviceId() ?: throw IllegalStateException("Device not paired")
 
                                             val payload = ApprovePlanReq(
                                                 device_id = deviceId,
                                                 biometric_present = true,
-                                                approval_receipt = ApprovalReceipt("ED25519", pub, sig)
+                                                approval_receipt = ApprovalReceipt("ED25519", pub, sig,
+                                                    ActionApprovalV2.PROTOCOL)
                                             )
 
                                             val controlPlane = ControlPlaneApi(apiClient.client, apiClient.apiUrl(""))
@@ -155,6 +185,32 @@ fun PlanPreviewScreen(
             }
 
             if (planData != null) {
+                if (actionBindingError != null) {
+                    Card(colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text("Approval blocked — unverifiable exact action",
+                                style = MaterialTheme.typography.titleMedium)
+                            Text(actionBindingError, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+                // Exact bytes are displayed in full, untruncated, in this
+                // vertically scrollable approval view. Their SHA-256 is checked
+                // locally before the Confirm button is enabled.
+                KiluSectionHeader(label = "Exact execution payload — review all bytes")
+                KiluCard {
+                    Text(planData!!.action_payload_json ?: "Missing exact payload",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        softWrap = true)
+                    KiluDivider()
+                    KiluBindingRow("Action SHA-256", planData!!.action_digest ?: "—")
+                    KiluBindingRow("AVO SHA-256", planData!!.avo_hash ?: "—")
+                    KiluBindingRow("Approval protocol", planData!!.approval_protocol ?: "Legacy / not valid")
+                }
+
                 // Binding warning (not a blocker — real check is server-side)
                 if (bindingWarning != null) {
                     Card(
