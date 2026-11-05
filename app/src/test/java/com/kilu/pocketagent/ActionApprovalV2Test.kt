@@ -40,6 +40,12 @@ class ActionApprovalV2Test {
             "71:sha256:" + "b".repeat(64) +
             "4:rt-14:tc-1"
         assertEquals(expected, message.toString(Charsets.UTF_8))
+        // Shared cross-language vector. Cloud approval_v2.ts independently
+        // checks the exact same digest over the framing, not a paraphrase.
+        assertEquals(
+            "sha256:d864c03fee6485853d3e5c62e2f1f19173dcf4ad71cb244183b6fc4d2bf8af31",
+            ActionApprovalV2.sha256(message.toString(Charsets.UTF_8))
+        )
         val changed = ActionApprovalV2.message(
             "pln_v2","sha256:" + "a".repeat(64),
             "sha256:" + "b".repeat(64),"rt-2","tc-1"
