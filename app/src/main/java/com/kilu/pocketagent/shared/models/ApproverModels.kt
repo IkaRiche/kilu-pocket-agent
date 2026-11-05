@@ -147,7 +147,13 @@ data class PlanPreviewResp(
     val steps_preview: List<PlanStep>? = null,
     val runtime_id: String? = null,
     val toolchain_id: String? = null,
-    val hub_name: String? = null
+    val hub_name: String? = null,
+    // CREG-003 opt-in. The older PlanPreview protocol intentionally stays
+    // readable, but is NOT valid for C2 signed-what-you-see promotion.
+    val approval_protocol: String? = null,
+    val avo_hash: String? = null,
+    val action_payload_json: String? = null,
+    val action_digest: String? = null
 )
 
 @Serializable
@@ -169,7 +175,8 @@ data class TaskReportResp(
 data class ApprovalReceipt(
     val pubkey_alg: String,
     val pubkey_b64: String,
-    val signature_b64: String
+    val signature_b64: String,
+    val approval_protocol: String? = null
 )
 
 @Serializable
